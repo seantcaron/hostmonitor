@@ -33,7 +33,7 @@ func main() {
 }
 
 // temporary database for testing:
-// create table reports (timestamp varchar(255), hostname varchar(255), numcpus varchar(255), physmem varchar(255), loadone varchar(255), loadfive varchar(255), loadfifteen varchar(255), swapused varchar(255), diskreport varchar(255));
+// create table reports (timestamp bigint, hostname varchar(255), numcpus varchar(255), physmem varchar(255), loadone varchar(255), loadfive varchar(255), loadfifteen varchar(255), swapused varchar(255), diskreport varchar(255));
 //
 
 func handle_connection(c net.Conn) {
@@ -41,7 +41,7 @@ func handle_connection(c net.Conn) {
     var dbUser string = "hostmon"
     var dbPass string = "xyzzy123"
     var dbName string = "hostmonitor"
-    var dbHost string = "192.168.1.253"
+    var dbHost string = "localhost"
 
     var myDSN string;
     
@@ -85,28 +85,31 @@ func handle_connection(c net.Conn) {
 	}
 	
 	// Prepare the command to retrieve the previous set of data points for this host
-	dbCmd := "SELECT timestamp from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
+	dbCmd := "SELECT * from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
 	fmt.Printf("Attempting to execute:\n%s\n", dbCmd)
 
 
 
         // I guess we can't use SELECT * with QueryRow, we need to SELECT a particular field from the row otherwise
 	//  we will get an error, attempting to execute the QueryRow statement.
+	// (We can, but we have to specify the correct number of fields in the Scan() call. If we only select one
+	//  parameter, it works fine if we only specify one parameter to the Scan() function)
+	//
+	// We know how many fields we have up front, and we just specify N parameters to QueryRow().Scan() i.e.
+	//  db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
 	
-        var result string
-	queryErr := dbconn.QueryRow(dbCmd).Scan(&result)
+	var dbTimeStamp, dbHostName, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
+	
+	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
 	switch {
+	    // If this happens, first database entry for the host in question
 	    case queryErr == sql.ErrNoRows:
 	        fmt.Printf("ERROR: No rows returned by the SELECT!\n")
 	    case queryErr != nil:
 	        fmt.Printf("ERROR: Some other error occurred executing the SELECT!\n")
 	    default:
-	        fmt.Printf("Retrieved: %s\n", result)
+	        fmt.Printf("Retrieved: %s %s %s %s %s\n", dbTimeStamp, dbHostName, dbLoadOne, dbSwapPctUsed, dbDiskReport)
 	}
-
-
-
-	
 
 	// Prepare the command to insert the newest set of data points
 	
@@ -118,6 +121,10 @@ func handle_connection(c net.Conn) {
 	if dbExecErr != nil {
 	    fmt.Printf("ERROR executing insert statement!\n")
 	}
+	
+	//
+	// Now we have historic and current data points so we can act on these i.e. calculate a differential and send notifications
+	//
 	
 	dbconn.Close()
     }
