@@ -65,14 +65,6 @@ func handle_connection(c net.Conn) {
 	swapPctUsed := data[7]
 	diskReport := data[8]
 	
-        //fmt.Printf("%s\n", input.Text())
-    
-        fmt.Printf("Got report from %s on %s\n", hostName, timeStamp)
-	fmt.Printf("numCPUs: %s physMem: %s\n", numCPUs, physMem)
-	fmt.Printf("Load averages: %s %s %s\n", loadOne, loadFive, loadFifteen)
-	fmt.Printf("Swap percent used: %s\n", swapPctUsed)
-	fmt.Printf("%s\n", diskReport)
-	
 	// The DSN used to connect to the database should look like this:
 	// hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
 	
@@ -86,12 +78,39 @@ func handle_connection(c net.Conn) {
 	    fmt.Printf("ERROR connecting to database!\n")
 	}
 	
+	// Test the connection and make sure we're in business
 	dbPingErr := dbconn.Ping()
 	if dbPingErr != nil {
 	    fmt.Printf("ERROR attempting to ping database connection!\n")
 	}
 	
-	dbCmd := "INSERT INTO reports VALUES ('" + timeStamp + "','" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
+	// Prepare the command to retrieve the previous set of data points for this host
+	dbCmd := "SELECT timestamp from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
+	fmt.Printf("Attempting to execute:\n%s\n", dbCmd)
+
+
+
+        // I guess we can't use SELECT * with QueryRow, we need to SELECT a particular field from the row otherwise
+	//  we will get an error, attempting to execute the QueryRow statement.
+	
+        var result string
+	queryErr := dbconn.QueryRow(dbCmd).Scan(&result)
+	switch {
+	    case queryErr == sql.ErrNoRows:
+	        fmt.Printf("ERROR: No rows returned by the SELECT!\n")
+	    case queryErr != nil:
+	        fmt.Printf("ERROR: Some other error occurred executing the SELECT!\n")
+	    default:
+	        fmt.Printf("Retrieved: %s\n", result)
+	}
+
+
+
+	
+
+	// Prepare the command to insert the newest set of data points
+	
+	dbCmd = "INSERT INTO reports VALUES (" + timeStamp + ",'" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
 	
 	fmt.Printf("Attempting to execute:\n%s\n", dbCmd)
 	
