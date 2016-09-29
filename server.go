@@ -41,7 +41,7 @@ func handle_connection(c net.Conn) {
     var dbUser string = "hostmon"
     var dbPass string = "xyzzy123"
     var dbName string = "hostmonitor"
-    var dbHost string = "csgadmin.sph.umich.edu"
+    var dbHost string = "192.168.1.253"
 
     var myDSN string;
     
@@ -73,9 +73,32 @@ func handle_connection(c net.Conn) {
 	fmt.Printf("Swap percent used: %s\n", swapPctUsed)
 	fmt.Printf("%s\n", diskReport)
 	
-        myDSN = dbUser + ":" + dbPass + "@" + dbHost + "/" + dbName
+	// The DSN used to connect to the database should look like this:
+	// hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
+	
+        myDSN = dbUser + ":" + dbPass + "@tcp(" + dbHost + ":3306)/" + dbName
     
-        dbconn, _ := sql.Open("mysql", myDSN)
+        fmt.Printf("DEBUG: Attempting to connect with DSN: %s\n", myDSN)
+	
+        dbconn, dbConnErr := sql.Open("mysql", myDSN)
+	
+	if dbConnErr != nil {
+	    fmt.Printf("ERROR connecting to database!\n")
+	}
+	
+	dbPingErr := dbconn.Ping()
+	if dbPingErr != nil {
+	    fmt.Printf("ERROR attempting to ping database connection!\n")
+	}
+	
+	dbCmd := "INSERT INTO reports VALUES ('" + timeStamp + "','" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
+	
+	fmt.Printf("Attempting to execute:\n%s\n", dbCmd)
+	
+	_, dbExecErr := dbconn.Exec(dbCmd)
+	if dbExecErr != nil {
+	    fmt.Printf("ERROR executing insert statement!\n")
+	}
 	
 	dbconn.Close()
     }
