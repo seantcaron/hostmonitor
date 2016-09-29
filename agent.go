@@ -224,7 +224,7 @@ func getDiskInfo() string {
         return ""
     }
 
-    returned = strings.Trim(returned, ",")
+    returned = strings.Trim(returned, " ")
     
     return returned
 }
