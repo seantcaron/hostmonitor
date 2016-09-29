@@ -17,6 +17,7 @@ import (
     "strings"
     "strconv"
     "time"
+    "net"
 )
 
 func main() {
@@ -40,8 +41,15 @@ func main() {
     if (strings.Index(host, ".") != -1) {
         host = host[0:strings.Index(host, ".")]
     }
+        
+    conn, err := net.Dial("tcp", "localhost:5962")
+    if err != nil {
+        return
+    }
     
-    fmt.Printf("%d,%s,%d,%d,%f,%f,%f,%f,%s\n", timestamp, host, nc, mt, om, fivm, fifm, swap_used_pct, diskReport)
+    fmt.Fprintf(conn, "%d,%s,%d,%d,%f,%f,%f,%f,%s\n", timestamp, host, nc, mt, om, fivm, fifm, swap_used_pct, diskReport)
+    
+    conn.Close()
 }
 
 // Get number of installed CPUs
@@ -177,37 +185,37 @@ func getDiskInfo() string {
 	
 	if ( data[5] == "/" ) {
 	    //rootUsed := data[4]
-	    returned = returned + data[5] + "," + data[4] + ","
+	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/exports" ) {
 	    //exportsUsed := data[4]
-	    returned = returned + data[5] + "," + data[4] + ","
+	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/incoming" ) {
 	    //incomingUsed := data[4]
-	    returned = returned + data[5] + "," + data[4] + ","
+	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/working" ) {
 	    //workingUsed := data[4]
-	    returned = returned + data[5] + "," + data[4] + ","
+	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/home" ) {
 	    //homeUsed := data[4]
-	    returned = returned + data[5] + "," + data[4] + ","
+	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/var" ) {
 	    //varUsed := data[4]
-	    returned = returned + data[5] + "," + data[4] + ","
+	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/tmp" ) {
 	    //tmpUsed := data[4]
-	    returned = returned + data[5] + "," + data[4] + ","
+	    returned = returned + data[5] + " " + data[4] + " "
 	}
     }
     
