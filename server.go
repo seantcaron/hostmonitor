@@ -10,9 +10,13 @@ import (
     // "os"
     "fmt"
     "strings"
+    "strconv"
     "bufio"
+    "math"
     "database/sql"
     _ "github.com/go-sql-driver/mysql"
+    "net/smtp"
+    "bytes"
 )
 
 func main() {
@@ -43,7 +47,18 @@ func handle_connection(c net.Conn) {
     var dbName string = "hostmonitor"
     var dbHost string = "localhost"
 
+    //var loadThreshold float64 = 35.0
+    var loadThreshold float64 = 0.01
+    var swapThreshold float64 = 30.0
+    
+    //var loadFirstDThreshold float64 = 10.0
+    var loadFirstDThreshold float64 = 0.01
+    var swapFirstDThreshold float64 = 5.0
+    
     var myDSN string;
+    
+    eMailTo := []string{"scaron@umich.edu"}
+    eMailFrom := []string{"do-not-reply@umich.edu"}
     
     input := bufio.NewScanner(c)
     
@@ -124,6 +139,58 @@ func handle_connection(c net.Conn) {
 	
 	//
 	// Now we have historic and current data points so we can act on these i.e. calculate a differential and send notifications
+	//
+	
+	dbLoadOneF,_ := strconv.ParseFloat(dbLoadOne, 64)
+	loadOneF, _ := strconv.ParseFloat(loadOne, 64)
+	dbSwapPctUsedF, _ := strconv.ParseFloat(dbSwapPctUsed, 64)
+	swapPctUsedF, _ := strconv.ParseFloat(swapPctUsed, 64)
+	
+	loadDifferential := math.Abs(dbLoadOneF-loadOneF)
+	swapDifferential := math.Abs(dbSwapPctUsedF-swapPctUsedF)
+	
+	fmt.Printf("Load diff: %f Swap diff: %f\n", loadDifferential, swapDifferential)
+	
+	// Send load notification e-mail	
+	if ((loadOneF > loadThreshold) && (loadDifferential > loadFirstDThreshold)) {
+	    eMailConn, eMailErr := smtp.Dial("localhost:25")
+	    if eMailErr != nil {
+	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	    }
+
+            
+	    eMailConn.Mail(strings.Join(eMailFrom,""))
+	    eMailConn.Rcpt(strings.Join(eMailTo,""))
+	    wc, _ := eMailConn.Data()
+	    
+	    defer wc.Close()
+	    
+	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: System load warning on " + hostName +
+	                       "\r\n\r\n" + "System load has reached " + loadOne + "\r\n")
+	    buf.WriteTo(wc)
+	}
+	
+	// Send swap notification e-mail
+	if ((swapPctUsedF > swapThreshold) && (swapDifferential > swapFirstDThreshold)) {
+	    eMailConn, eMailErr := smtp.Dial("localhost:25")
+	    if eMailErr != nil {
+	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	    }
+	    
+	    eMailConn.Mail(strings.Join(eMailFrom,""))
+	    eMailConn.Rcpt(strings.Join(eMailTo,""))
+	    
+	    wc, _ := eMailConn.Data()
+	    
+	    defer wc.Close()
+	    
+	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: Swap utilization warning on " + hostName +
+	                        "\r\n\r\n" + "Swap utilization has reached " + swapPctUsed + "%\r\n")
+	    buf.WriteTo(wc)			
+	}
+	
+	//
+	// Update swap differential per-host table, and disk utilization per-host table
 	//
 	
 	dbconn.Close()
