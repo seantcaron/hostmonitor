@@ -161,32 +161,45 @@ func handle_connection(c net.Conn) {
             
 	    eMailConn.Mail(strings.Join(eMailFrom,""))
 	    eMailConn.Rcpt(strings.Join(eMailTo,""))
-	    wc, _ := eMailConn.Data()
+	    wc, eMailErr := eMailConn.Data()
+	    if eMailErr != nil {
+	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	    }
 	    
 	    defer wc.Close()
 	    
-	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: System load warning on " + hostName +
-	                       "\r\n\r\n" + "System load has reached " + loadOne + "\r\n")
-	    buf.WriteTo(wc)
+	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: System load warning on " + hostName + "\r\n\r\n" + "System load has reached " + loadOne + "\r\n")
+	    
+	    _, eMailErr = buf.WriteTo(wc)
+	    if eMailErr != nil {
+	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	    }
+	    
 	}
 	
 	// Send swap notification e-mail
 	if ((swapPctUsedF > swapThreshold) && (swapDifferential > swapFirstDThreshold)) {
 	    eMailConn, eMailErr := smtp.Dial("localhost:25")
 	    if eMailErr != nil {
-	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	        fmt.Printf("ERROR sending swap notification e-mail!\n")
 	    }
 	    
 	    eMailConn.Mail(strings.Join(eMailFrom,""))
 	    eMailConn.Rcpt(strings.Join(eMailTo,""))
 	    
-	    wc, _ := eMailConn.Data()
+	    wc, eMailErr := eMailConn.Data()
+	    if eMailErr != nil {
+	        fmt.Printf("ERROR sending swap notification e-mail!\n")
+	    }
 	    
 	    defer wc.Close()
 	    
-	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: Swap utilization warning on " + hostName +
-	                        "\r\n\r\n" + "Swap utilization has reached " + swapPctUsed + "%\r\n")
-	    buf.WriteTo(wc)			
+	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: Swap utilization warning on " + hostName + "\r\n\r\n" + "Swap utilization has reached " + swapPctUsed + "%\r\n")
+	    
+	    _, eMailErr = buf.WriteTo(wc)
+	    if eMailErr != nil {
+	        fmt.Printf("ERROR sending swap notification e-mail!\n")
+            }			
 	}
 	
 	//
