@@ -8,7 +8,7 @@ package main
 import (
     // "io"
     "net"
-    // "os"
+    "os"
     "fmt"
     "strings"
     "strconv"
@@ -20,12 +20,98 @@ import (
     "bytes"
 )
 
+//
+// Configuration parameters go in global variables.
+//
+
+var g_dbUser, g_dbPass, g_dbHost, g_dbName, g_eMailTo, g_eMailFrom string
+var g_LoadThreshold, g_SwapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold float64
+var g_diskThreshold int64
+
 func main() {
 
+    //
+    // Read in the configuration file.
+    //
+    
+    confFile, err := os.Open("/etc/hostmonitor/server.conf")
+    
+    if err != nil {
+        fmt.Printf("Error opening configuration file!\n")
+	os.Exit(1)
+    }
+    
+    inp := bufio.NewScanner(confFile)
+    
+    for inp.Scan() {
+        line := inp.Text()
+	
+	theFields := strings.Fields(line)
+	
+	if (theFields[0] == "dbUser") {
+	    g_dbUser = theFields[1]
+	}
+	
+	if (theFields[0] == "dbPass") {
+	    g_dbPass = theFields[1]
+	}
+	
+	if (theFields[0] == "dbHost") {
+	    g_dbHost = theFields[1]
+	}
+	
+	if (theFields[0] == "dbName") {
+	    g_dbName = theFields[1]
+	}
+	
+	if (theFields[0] == "eMailTo") {
+	    g_eMailTo = theFields[1]
+	}
+	
+	if (theFields[0] == "eMailFrom") {
+	    g_eMailFrom = theFields[1]
+	}
+	
+	if (theFields[0] == "loadThreshold") {
+	    g_LoadThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	}
+	
+	if (theFields[0] == "swapThreshold") {
+	    g_SwapThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	}
+	
+	if (theFields[0] == "loadFirstDThreshold") {
+	    g_loadFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	}
+	
+	if (theFields[0] == "swapFirstDThreshold") {
+	    g_swapFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	}
+	
+	if (theFields[0] == "diskThreshold") {
+	    g_diskThreshold, _ = strconv.ParseInt(theFields[1], 10, 64)
+	}
+    }
+    
+    fmt.Printf("\nCONFIGURATION REPORT:\n")
+    fmt.Printf("dbUser %s dbPass %s dbHost %s dbName %s\n", g_dbUser, g_dbPass, g_dbHost, g_dbName)
+    fmt.Printf("eMailTo %s eMailFrom %s\n", g_eMailTo, g_eMailFrom)
+    fmt.Printf("Thresholds: %f %f %f %f %d\n\n", g_LoadThreshold, g_SwapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)
+    
+    confFile.Close()
+    
+    //
+    // Start listening for connections
+    //
+    
     listener, err := net.Listen("tcp", "localhost:5962")
     if err != nil {
         return
     }
+    
+    //
+    // Spin off a new Goroutine for each connection
+    //
     
     for {
         conn, err := listener.Accept()
