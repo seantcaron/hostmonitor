@@ -1,5 +1,6 @@
 //
-// Host monitor data collection server, Sean Caron, scaron@umich.edu
+// Host monitor data collection server
+//  Sean Caron scaron@umich.edu
 //
 
 package main
@@ -47,13 +48,13 @@ func handle_connection(c net.Conn) {
     var dbName string = "hostmonitor"
     var dbHost string = "localhost"
 
-    //var loadThreshold float64 = 35.0
-    var loadThreshold float64 = 0.01
+    var loadThreshold float64 = 35.0
     var swapThreshold float64 = 30.0
     
-    //var loadFirstDThreshold float64 = 10.0
-    var loadFirstDThreshold float64 = 0.01
+    var loadFirstDThreshold float64 = 10.0
     var swapFirstDThreshold float64 = 5.0
+    
+    var diskThreshold int64 = 95
     
     var myDSN string;
     
@@ -80,8 +81,10 @@ func handle_connection(c net.Conn) {
 	swapPctUsed := data[7]
 	diskReport := data[8]
 	
+	//
 	// The DSN used to connect to the database should look like this:
-	// hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
+	//   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
+	//
 	
         myDSN = dbUser + ":" + dbPass + "@tcp(" + dbHost + ":3306)/" + dbName
     
@@ -93,17 +96,21 @@ func handle_connection(c net.Conn) {
 	    fmt.Printf("ERROR connecting to database!\n")
 	}
 	
-	// Test the connection and make sure we're in business
+	//
+	// Test the database connection to make sure that we're in business.
+	//
+	
 	dbPingErr := dbconn.Ping()
 	if dbPingErr != nil {
 	    fmt.Printf("ERROR attempting to ping database connection!\n")
 	}
 	
-	// Prepare the command to retrieve the previous set of data points for this host
+	//
+	// Retrieve the previous set of data points acquired for this host from the database.
+	//
+	
 	dbCmd := "SELECT * from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
 	fmt.Printf("Attempting to execute:\n%s\n", dbCmd)
-
-
 
         // I guess we can't use SELECT * with QueryRow, we need to SELECT a particular field from the row otherwise
 	//  we will get an error, attempting to execute the QueryRow statement.
@@ -126,7 +133,9 @@ func handle_connection(c net.Conn) {
 	        fmt.Printf("Retrieved: %s %s %s %s %s\n", dbTimeStamp, dbHostName, dbLoadOne, dbSwapPctUsed, dbDiskReport)
 	}
 
-	// Prepare the command to insert the newest set of data points
+        //
+	// Insert the newest set of data points acquired for this host into the database.
+	//
 	
 	dbCmd = "INSERT INTO reports VALUES (" + timeStamp + ",'" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
 	
@@ -137,8 +146,11 @@ func handle_connection(c net.Conn) {
 	    fmt.Printf("ERROR executing insert statement!\n")
 	}
 	
+	dbconn.Close()
+	
 	//
-	// Now we have historic and current data points so we can act on these i.e. calculate a differential and send notifications
+	// Now we have historic (from the database) and current (from the current connection) data points and we
+	// can act on these i.e. calculate differentials and send notifications.
 	//
 	
 	dbLoadOneF,_ := strconv.ParseFloat(dbLoadOne, 64)
@@ -151,14 +163,16 @@ func handle_connection(c net.Conn) {
 	
 	fmt.Printf("Load diff: %f Swap diff: %f\n", loadDifferential, swapDifferential)
 	
-	// Send load notification e-mail	
+	//
+	// Look at system load for this host and send notification if the threshold is exceeded.
+	//
+		
 	if ((loadOneF > loadThreshold) && (loadDifferential > loadFirstDThreshold)) {
 	    eMailConn, eMailErr := smtp.Dial("localhost:25")
 	    if eMailErr != nil {
 	        fmt.Printf("ERROR sending load notification e-mail!\n")
 	    }
-
-            
+       
 	    eMailConn.Mail(strings.Join(eMailFrom,""))
 	    eMailConn.Rcpt(strings.Join(eMailTo,""))
 	    wc, eMailErr := eMailConn.Data()
@@ -174,10 +188,12 @@ func handle_connection(c net.Conn) {
 	    if eMailErr != nil {
 	        fmt.Printf("ERROR sending load notification e-mail!\n")
 	    }
-	    
 	}
 	
-	// Send swap notification e-mail
+        //
+	// Look at swap utilization for this host and send notification if the threshold is exceeded.
+	//
+	
 	if ((swapPctUsedF > swapThreshold) && (swapDifferential > swapFirstDThreshold)) {
 	    eMailConn, eMailErr := smtp.Dial("localhost:25")
 	    if eMailErr != nil {
@@ -202,11 +218,43 @@ func handle_connection(c net.Conn) {
             }			
 	}
 	
-	//
-	// Update swap differential per-host table, and disk utilization per-host table
+        //
+	// Now let's look at the disk utilization report for this host and send an alert if the threshold
+	// is exceeded.
 	//
 	
-	dbconn.Close()
+        diskReptComponents := strings.Fields(diskReport)
+	
+	for i := 0; i < len(diskReptComponents)-1; i++ {
+	
+	    valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
+	    
+	    if valueToTest >= diskThreshold {
+	        eMailConn, eMailErr := smtp.Dial("localhost:25")
+		if eMailErr != nil {
+		    fmt.Printf("ERROR sending disk utilization notification e-mail!\n")
+		}
+		
+		eMailConn.Mail(strings.Join(eMailFrom,""))
+		eMailConn.Rcpt(strings.Join(eMailTo,""))
+		
+		wc, eMailErr := eMailConn.Data()
+		if eMailErr != nil {
+		    fmt.Printf("ERROR sending disk utilization notification e-mail!\n")
+		}
+		
+		defer wc.Close()
+		
+		buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: Disk utilization warning on " + hostName + "\r\n\r\n" + "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%\r\n")
+		
+		_, eMailErr = buf.WriteTo(wc)
+		if eMailErr != nil {
+		    fmt.Printf("ERROR sending disk utilization notification e-mail!\n")
+		}
+	    }
+	}
+	
+	
     }
     
     c.Close()
