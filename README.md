@@ -20,6 +20,13 @@ points:
 A server runs on a central collection point and accepts connections from the
 agent. Reports are read in, tokenized and written to a MySQL database.
 
-At some point, a process will run reports against the database, which can be
-used to generate notification e-mails, prepare a Web dashboard and so on.
+The server looks at the current and historic data in each host thread and will
+send notification e-mails to a specified address ased on the following criterion:
+
+* System load exceeds threshold
+* Swap utilization exceeds threshold
+* Disk utilization on any reported partition exceeds threshold
+
+A separate app will be implemented to, for example, prepare a Web dashboard from
+the contents of the database.
 
