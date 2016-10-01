@@ -6,7 +6,7 @@
 package main
 
 import (
-    // "io"
+    //"io"
     "net"
     "os"
     "fmt"
@@ -18,6 +18,8 @@ import (
     _ "github.com/go-sql-driver/mysql"
     "net/smtp"
     "bytes"
+    "log"
+    "time"
 )
 
 //
@@ -25,20 +27,42 @@ import (
 //
 
 var g_dbUser, g_dbPass, g_dbHost, g_dbName, g_eMailTo, g_eMailFrom string
-var g_LoadThreshold, g_SwapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold float64
+var g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold float64
 var g_diskThreshold int64
 
 func main() {
 
     //
+    // Open log file
+    //
+    
+    logFile, err := os.Create("/var/log/hostmonitor.log")
+    
+    if err != nil {
+        log.Fatalf("Failed opening log file for writing\n")
+    }
+    
+    theLog := bufio.NewWriter(logFile)
+    
+    timeStamp := time.Now().Unix()
+    
+    fmt.Fprintf(theLog, "%d: Host monitor data server starting up\n", timeStamp)
+    theLog.Flush()
+    
+    //
     // Read in the configuration file.
     //
+    
+    haveParam := make(map[string]bool)
     
     confFile, err := os.Open("/etc/hostmonitor/server.conf")
     
     if err != nil {
-        fmt.Printf("Error opening configuration file!\n")
-	os.Exit(1)
+        timeStamp := time.Now().Unix()
+        fmt.Fprintf(theLog, "%d: Failed opening configuration file for reading\n", timeStamp)
+	theLog.Flush()
+        logFile.Close()
+        log.Fatalf("Failed opening configuration file for reading\n")
     }
     
     inp := bufio.NewScanner(confFile)
@@ -47,6 +71,8 @@ func main() {
         line := inp.Text()
 	
 	theFields := strings.Fields(line)
+	
+	haveParam[theFields[0]] = true
 	
 	if (theFields[0] == "dbUser") {
 	    g_dbUser = theFields[1]
@@ -73,11 +99,11 @@ func main() {
 	}
 	
 	if (theFields[0] == "loadThreshold") {
-	    g_LoadThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	    g_loadThreshold, _ = strconv.ParseFloat(theFields[1], 64)
 	}
 	
 	if (theFields[0] == "swapThreshold") {
-	    g_SwapThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	    g_swapThreshold, _ = strconv.ParseFloat(theFields[1], 64)
 	}
 	
 	if (theFields[0] == "loadFirstDThreshold") {
@@ -93,10 +119,35 @@ func main() {
 	}
     }
     
-    fmt.Printf("\nCONFIGURATION REPORT:\n")
-    fmt.Printf("dbUser %s dbPass %s dbHost %s dbName %s\n", g_dbUser, g_dbPass, g_dbHost, g_dbName)
-    fmt.Printf("eMailTo %s eMailFrom %s\n", g_eMailTo, g_eMailFrom)
-    fmt.Printf("Thresholds: %f %f %f %f %d\n\n", g_LoadThreshold, g_SwapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)
+    //
+    // Make sure no configuration directives are missing
+    //
+    
+    if ((haveParam["dbUser"] != true) ||
+        (haveParam["dbPass"] != true) ||
+	(haveParam["dbHost"] != true) ||
+	(haveParam["dbName"] != true) ||
+        (haveParam["eMailTo"] != true) ||
+	(haveParam["eMailFrom"] != true) ||
+	(haveParam["loadThreshold"] != true) ||
+	(haveParam["swapThreshold"] != true) ||
+	(haveParam["loadFirstDThreshold"] != true) ||
+	(haveParam["swapFirstDThreshold"] != true) ||
+	(haveParam["diskThreshold"] != true)) {
+        timeStamp = time.Now().Unix()
+	fmt.Fprintf(theLog, "%d: Fatal missing configuration directive\n")
+	theLog.Flush()
+	logFile.Close()
+	log.Fatalf("Fatal missing configuration directive\n")
+    }
+    
+    timeStamp = time.Now().Unix()
+    fmt.Fprintf(theLog, "%d: Configuration report follows\n", timeStamp)
+    
+    fmt.Fprintf(theLog, "            dbUser %s dbPass %s dbHost %s dbName %s\n", g_dbUser, g_dbPass, g_dbHost, g_dbName)
+    fmt.Fprintf(theLog, "            eMailTo %s eMailFrom %s\n", g_eMailTo, g_eMailFrom)
+    fmt.Fprintf(theLog, "            Thresholds: %f %f %f %f %d\n\n", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)  
+    theLog.Flush()
     
     confFile.Close()
     
@@ -106,7 +157,11 @@ func main() {
     
     listener, err := net.Listen("tcp", "localhost:5962")
     if err != nil {
-        return
+        timeStamp = time.Now().Unix()
+	fmt.Fprintf(theLog, "%d: Failure calling net.Listen()\n")
+	theLog.Flush()
+	logFile.Close()
+	log.Fatalf("Failure calling net.Listen()\n")
     }
     
     //
@@ -116,40 +171,27 @@ func main() {
     for {
         conn, err := listener.Accept()
 	if err != nil {
+	    timeStamp = time.Now().Unix()
+	    fmt.Fprintf(theLog, "%d: Non zero value returned by listener.Accept()\n")
+	    theLog.Flush()
 	    continue
 	}
 	
-	go handle_connection(conn)
+	go handle_connection(conn, logFile)
     }
 }
 
+//
 // temporary database for testing:
 // create table reports (timestamp bigint, hostname varchar(255), numcpus varchar(255), physmem varchar(255), loadone varchar(255), loadfive varchar(255), loadfifteen varchar(255), swapused varchar(255), diskreport varchar(255));
 //
 
-func handle_connection(c net.Conn) {
+func handle_connection(c net.Conn, f *os.File) {
 
-    var dbUser string = "hostmon"
-    var dbPass string = "xyzzy123"
-    var dbName string = "hostmonitor"
-    var dbHost string = "localhost"
-
-    var loadThreshold float64 = 35.0
-    var swapThreshold float64 = 30.0
-    
-    var loadFirstDThreshold float64 = 10.0
-    var swapFirstDThreshold float64 = 5.0
-    
-    var diskThreshold int64 = 95
-    
     var myDSN string;
     
-    eMailTo := []string{"scaron@umich.edu"}
-    eMailFrom := []string{"do-not-reply@umich.edu"}
-    
+    log := bufio.NewWriter(f)
     input := bufio.NewScanner(c)
-    
-    fmt.Printf("%s\n", input.Text())
     
     for input.Scan() {
     
@@ -172,14 +214,20 @@ func handle_connection(c net.Conn) {
 	//   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
 	//
 	
-        myDSN = dbUser + ":" + dbPass + "@tcp(" + dbHost + ":3306)/" + dbName
+        myDSN = g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
     
-        fmt.Printf("DEBUG: Attempting to connect with DSN: %s\n", myDSN)
+        logTimeStamp := time.Now().Unix()
+        fmt.Fprintf(log, "%d: Attempting to connect with DSN: %s\n", logTimeStamp, myDSN)
+	log.Flush()
 	
         dbconn, dbConnErr := sql.Open("mysql", myDSN)
 	
 	if dbConnErr != nil {
-	    fmt.Printf("ERROR connecting to database!\n")
+	    logTimeStamp = time.Now().Unix()
+	    fmt.Fprintf(log, "%d: Error connecting to database\n")
+	    log.Flush()
+	    f.Close()
+	    os.Exit(1)
 	}
 	
 	//
@@ -188,7 +236,11 @@ func handle_connection(c net.Conn) {
 	
 	dbPingErr := dbconn.Ping()
 	if dbPingErr != nil {
-	    fmt.Printf("ERROR attempting to ping database connection!\n")
+	    logTimeStamp = time.Now().Unix()
+	    fmt.Fprintf(log, "%d: Error attempting to ping database connection\n")
+	    log.Flush()
+	    f.Close()
+	    os.Exit(1)
 	}
 	
 	//
@@ -196,7 +248,6 @@ func handle_connection(c net.Conn) {
 	//
 	
 	dbCmd := "SELECT * from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
-	fmt.Printf("Attempting to execute:\n%s\n", dbCmd)
 
         // I guess we can't use SELECT * with QueryRow, we need to SELECT a particular field from the row otherwise
 	//  we will get an error, attempting to execute the QueryRow statement.
@@ -209,14 +260,21 @@ func handle_connection(c net.Conn) {
 	var dbTimeStamp, dbHostName, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
 	
 	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
+	
+	logTimeStamp = time.Now().Unix()
 	switch {
 	    // If this happens, first database entry for the host in question
 	    case queryErr == sql.ErrNoRows:
-	        fmt.Printf("ERROR: No rows returned by the SELECT!\n")
+	        fmt.Fprintf(log, "%d: No rows returned executing the SELECT\n", logTimeStamp)
+		log.Flush()
 	    case queryErr != nil:
-	        fmt.Printf("ERROR: Some other error occurred executing the SELECT!\n")
+		fmt.Fprintf(log, "%d: Some other error occurred executing the SELECT\n", logTimeStamp)
+		log.Flush()
+		f.Close()
+		dbconn.Close()
+		os.Exit(1)
 	    default:
-	        fmt.Printf("Retrieved: %s %s %s %s %s\n", dbTimeStamp, dbHostName, dbLoadOne, dbSwapPctUsed, dbDiskReport)
+	        continue
 	}
 
         //
@@ -225,11 +283,14 @@ func handle_connection(c net.Conn) {
 	
 	dbCmd = "INSERT INTO reports VALUES (" + timeStamp + ",'" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
 	
-	fmt.Printf("Attempting to execute:\n%s\n", dbCmd)
-	
 	_, dbExecErr := dbconn.Exec(dbCmd)
 	if dbExecErr != nil {
-	    fmt.Printf("ERROR executing insert statement!\n")
+	    logTimeStamp = time.Now().Unix()
+	    fmt.Fprintf(log, "%d: Failure executing INSERT statement\n", logTimeStamp)
+	    log.Flush()
+	    f.Close()
+	    dbconn.Close()
+	    os.Exit(1)
 	}
 	
 	dbconn.Close()
@@ -247,32 +308,36 @@ func handle_connection(c net.Conn) {
 	loadDifferential := math.Abs(dbLoadOneF-loadOneF)
 	swapDifferential := math.Abs(dbSwapPctUsedF-swapPctUsedF)
 	
-	fmt.Printf("Load diff: %f Swap diff: %f\n", loadDifferential, swapDifferential)
-	
 	//
 	// Look at system load for this host and send notification if the threshold is exceeded.
 	//
 		
-	if ((loadOneF > loadThreshold) && (loadDifferential > loadFirstDThreshold)) {
+	if ((loadOneF > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
 	    eMailConn, eMailErr := smtp.Dial("localhost:25")
 	    if eMailErr != nil {
-	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	        logTimeStamp = time.Now().Unix()
+		fmt.Fprintf(log, "%d: SMTP server connection failure sending load notification\n", logTimeStamp)
+		log.Flush()
 	    }
        
-	    eMailConn.Mail(strings.Join(eMailFrom,""))
-	    eMailConn.Rcpt(strings.Join(eMailTo,""))
+	    eMailConn.Mail(g_eMailFrom)
+	    eMailConn.Rcpt(g_eMailTo)
 	    wc, eMailErr := eMailConn.Data()
 	    if eMailErr != nil {
-	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	        logTimeStamp = time.Now().Unix()
+		fmt.Fprintf(log, "%d: Failure initiating DATA stage of sending load notification\n", logTimeStamp)
+		log.Flush()
 	    }
 	    
 	    defer wc.Close()
 	    
-	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: System load warning on " + hostName + "\r\n\r\n" + "System load has reached " + loadOne + "\r\n")
+	    buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + "Subject: System load warning on " + hostName + "\r\n\r\n" + "System load has reached " + loadOne + "\r\n")
 	    
 	    _, eMailErr = buf.WriteTo(wc)
 	    if eMailErr != nil {
-	        fmt.Printf("ERROR sending load notification e-mail!\n")
+	        logTimeStamp = time.Now().Unix()
+		fmt.Fprintf(log, "%d: Failure writing load notification message DATA\n", logTimeStamp)
+		log.Flush()
 	    }
 	}
 	
@@ -280,27 +345,33 @@ func handle_connection(c net.Conn) {
 	// Look at swap utilization for this host and send notification if the threshold is exceeded.
 	//
 	
-	if ((swapPctUsedF > swapThreshold) && (swapDifferential > swapFirstDThreshold)) {
+	if ((swapPctUsedF > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
 	    eMailConn, eMailErr := smtp.Dial("localhost:25")
 	    if eMailErr != nil {
-	        fmt.Printf("ERROR sending swap notification e-mail!\n")
+	        logTimeStamp = time.Now().Unix()
+		fmt.Fprintf(log, "%d: SMTP server connection failure sending swap notification\n", logTimeStamp)
+		log.Flush()
 	    }
 	    
-	    eMailConn.Mail(strings.Join(eMailFrom,""))
-	    eMailConn.Rcpt(strings.Join(eMailTo,""))
+	    eMailConn.Mail(g_eMailFrom)
+	    eMailConn.Rcpt(g_eMailTo)
 	    
 	    wc, eMailErr := eMailConn.Data()
 	    if eMailErr != nil {
-	        fmt.Printf("ERROR sending swap notification e-mail!\n")
+	        logTimeStamp = time.Now().Unix()
+		fmt.Fprintf(log, "%d: Failure initiating DATA stage of sending swap notification\n", logTimeStamp)
+		log.Flush()
 	    }
 	    
 	    defer wc.Close()
 	    
-	    buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: Swap utilization warning on " + hostName + "\r\n\r\n" + "Swap utilization has reached " + swapPctUsed + "%\r\n")
+	    buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + "Subject: Swap utilization warning on " + hostName + "\r\n\r\n" + "Swap utilization has reached " + swapPctUsed + "%\r\n")
 	    
 	    _, eMailErr = buf.WriteTo(wc)
 	    if eMailErr != nil {
-	        fmt.Printf("ERROR sending swap notification e-mail!\n")
+	        logTimeStamp = time.Now().Unix()
+		fmt.Fprintf(log, "%d: Failure writing swap notification message DATA\n", logTimeStamp)
+		log.Flush()
             }			
 	}
 	
@@ -315,33 +386,41 @@ func handle_connection(c net.Conn) {
 	
 	    valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 	    
-	    if valueToTest >= diskThreshold {
+	    if valueToTest >= g_diskThreshold {
 	        eMailConn, eMailErr := smtp.Dial("localhost:25")
 		if eMailErr != nil {
-		    fmt.Printf("ERROR sending disk utilization notification e-mail!\n")
+		    logTimeStamp = time.Now().Unix()
+		    fmt.Fprintf(log, "%d: SMTP server connection failure sending disk notification\n", logTimeStamp)
+		    log.Flush()
 		}
 		
-		eMailConn.Mail(strings.Join(eMailFrom,""))
-		eMailConn.Rcpt(strings.Join(eMailTo,""))
+		eMailConn.Mail(g_eMailFrom)
+		eMailConn.Rcpt(g_eMailTo)
 		
 		wc, eMailErr := eMailConn.Data()
 		if eMailErr != nil {
-		    fmt.Printf("ERROR sending disk utilization notification e-mail!\n")
+		    logTimeStamp = time.Now().Unix()
+		    fmt.Fprintf(log, "%d: Failure initiating DATA stage of sending disk notification\n", logTimeStamp)
+		    log.Flush()
 		}
 		
 		defer wc.Close()
 		
-		buf := bytes.NewBufferString("From: " + strings.Join(eMailFrom,"") + "\r\n" + "To: " + strings.Join(eMailTo,"") + "\r\n" + "Subject: Disk utilization warning on " + hostName + "\r\n\r\n" + "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%\r\n")
+		buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + "Subject: Disk utilization warning on " + hostName + "\r\n\r\n" + "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%\r\n")
 		
 		_, eMailErr = buf.WriteTo(wc)
 		if eMailErr != nil {
-		    fmt.Printf("ERROR sending disk utilization notification e-mail!\n")
+		    logTimeStamp = time.Now().Unix()
+		    fmt.Fprintf(log, "%d: Failure writing disk notification message DATA\n", logTimeStamp)
+		    log.Flush()
 		}
 	    }
 	}
 	
 	
     }
+    
+    f.Close()
     
     c.Close()
 }
