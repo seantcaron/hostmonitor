@@ -44,12 +44,6 @@ func main() {
     
     log_with_timestamp(logFile, "Host monitor data server starting up")
     
-    //theLog := bufio.NewWriter(logFile)
-    
-    //timeStamp := time.Now().Unix()
-    //fmt.Fprintf(theLog, "%d: Host monitor data server starting up\n", timeStamp)
-    //theLog.Flush()
-    
     //
     // Read in the configuration file.
     //
@@ -71,50 +65,35 @@ func main() {
 	
 	theFields := strings.Fields(line)
 	
+	key := strings.ToLower(theFields[0])
+	
 	haveParam[theFields[0]] = true
 	
-	if (theFields[0] == "dbUser") {
-	    g_dbUser = theFields[1]
-	}
-	
-	if (theFields[0] == "dbPass") {
-	    g_dbPass = theFields[1]
-	}
-	
-	if (theFields[0] == "dbHost") {
-	    g_dbHost = theFields[1]
-	}
-	
-	if (theFields[0] == "dbName") {
-	    g_dbName = theFields[1]
-	}
-	
-	if (theFields[0] == "eMailTo") {
-	    g_eMailTo = theFields[1]
-	}
-	
-	if (theFields[0] == "eMailFrom") {
-	    g_eMailFrom = theFields[1]
-	}
-	
-	if (theFields[0] == "loadThreshold") {
-	    g_loadThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	}
-	
-	if (theFields[0] == "swapThreshold") {
-	    g_swapThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	}
-	
-	if (theFields[0] == "loadFirstDThreshold") {
-	    g_loadFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	}
-	
-	if (theFields[0] == "swapFirstDThreshold") {
-	    g_swapFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	}
-	
-	if (theFields[0] == "diskThreshold") {
-	    g_diskThreshold, _ = strconv.ParseInt(theFields[1], 10, 64)
+	switch key {
+	    case "dbuser":
+	        g_dbUser = theFields[1]
+	    case "dbpass":
+	        g_dbPass = theFields[1]
+	    case "dbhost":
+	        g_dbHost = theFields[1]
+	    case "dbname":
+	        g_dbName = theFields[1]
+	    case "emailto":
+	        g_eMailTo = theFields[1]
+	    case "emailfrom":
+	        g_eMailFrom = theFields[1]
+	    case "loadthreshold":
+	        g_loadThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	    case "swapthreshold":
+	        g_swapThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	    case "loadfirstdthreshold":
+	        g_loadFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	    case "swapfirstdthreshold":
+	        g_swapFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	    case "diskthreshold":
+	        g_diskThreshold, _ = strconv.ParseInt(theFields[1], 10, 64)
+	    default:
+	        log_with_timestamp(logFile, "Ignoring nonsense configuration parameter " + theFields[1])
 	}
     }
     
