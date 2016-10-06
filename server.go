@@ -97,6 +97,8 @@ func main() {
 	}
     }
     
+    confFile.Close()
+    
     //
     // Make sure no configuration directives are missing
     //
@@ -117,15 +119,11 @@ func main() {
 	log.Fatalf("Fatal missing configuration directive\n")
     }
     
-    //timeStamp = time.Now().Unix()
-    //fmt.Fprintf(theLog, "%d: Configuration report follows\n", timeStamp)
-    
-    //fmt.Fprintf(theLog, "            dbUser %s dbPass %s dbHost %s dbName %s\n", g_dbUser, g_dbPass, g_dbHost, g_dbName)
-    //fmt.Fprintf(theLog, "            eMailTo %s eMailFrom %s\n", g_eMailTo, g_eMailFrom)
-    //fmt.Fprintf(theLog, "            Thresholds: %f %f %f %f %d\n\n", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)  
-    //theLog.Flush()
-    
-    confFile.Close()
+    log_with_timestamp(logFile, "Configuration report follows")
+    log_with_timestamp(logFile, "  DB user: " + g_dbUser + " DB host: " + g_dbHost + " DB name: " + g_dbName)
+    log_with_timestamp(logFile, "  E-mail to: " + g_eMailTo + " E-mail from: " + g_eMailFrom)
+    log_with_timestamp(logFile, fmt.Sprintf("  Thresholds: %f %f %f %f %d", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold))
+    log_with_timestamp(logFile, "Configuration report ends")
     
     //
     // Start listening for connections
@@ -288,26 +286,7 @@ func handle_connection(c net.Conn, f *os.File) {
 	//
 		
 	if ((loadOneF > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
-	    eMailConn, eMailErr := smtp.Dial("localhost:25")
-	    if eMailErr != nil {
-	        log_with_timestamp(f, "SMTP server connection failure sending load notification")
-	    }
-       
-	    eMailConn.Mail(g_eMailFrom)
-	    eMailConn.Rcpt(g_eMailTo)
-	    wc, eMailErr := eMailConn.Data()
-	    if eMailErr != nil {
-	        log_with_timestamp(f, "Failure initiating DATA stage sending load notification")
-	    }
-	    
-	    defer wc.Close()
-	    
-	    buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + "Subject: System load warning on " + hostName + "\r\n\r\n" + "System load has reached " + loadOne + "\r\n")
-	    
-	    _, eMailErr = buf.WriteTo(wc)
-	    if eMailErr != nil {
-	        log_with_timestamp(f, "Failure writing load notification message DATA")
-	    }
+	    send_email_notification(f, "Subject: System load warning on " + hostName, "System load has reached " + loadOne)
 	}
 	
         //
@@ -315,27 +294,7 @@ func handle_connection(c net.Conn, f *os.File) {
 	//
 	
 	if ((swapPctUsedF > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
-	    eMailConn, eMailErr := smtp.Dial("localhost:25")
-	    if eMailErr != nil {
-	        log_with_timestamp(f, "SMTP server connection failure sending swap notification")
-	    }
-	    
-	    eMailConn.Mail(g_eMailFrom)
-	    eMailConn.Rcpt(g_eMailTo)
-	    
-	    wc, eMailErr := eMailConn.Data()
-	    if eMailErr != nil {
-	        log_with_timestamp(f, "Failure initiating DATA stage sending swap notification")
-	    }
-	    
-	    defer wc.Close()
-	    
-	    buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + "Subject: Swap utilization warning on " + hostName + "\r\n\r\n" + "Swap utilization has reached " + swapPctUsed + "%\r\n")
-	    
-	    _, eMailErr = buf.WriteTo(wc)
-	    if eMailErr != nil {
-	        log_with_timestamp(f, "Failure writing swap notification message DATA")
-            }			
+	    send_email_notification(f, "Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "%")	
 	}
 	
         //
@@ -346,39 +305,15 @@ func handle_connection(c net.Conn, f *os.File) {
         diskReptComponents := strings.Fields(diskReport)
 	
 	for i := 0; i < len(diskReptComponents)-1; i++ {
-	
 	    valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 	    
 	    if valueToTest >= g_diskThreshold {
-	        eMailConn, eMailErr := smtp.Dial("localhost:25")
-		if eMailErr != nil {
-		    log_with_timestamp(f, "SMTP server connection failure sending disk notification")
-		}
-		
-		eMailConn.Mail(g_eMailFrom)
-		eMailConn.Rcpt(g_eMailTo)
-		
-		wc, eMailErr := eMailConn.Data()
-		if eMailErr != nil {
-		    log_with_timestamp(f, "Failure initiating DATA stage sending disk notification")
-		}
-		
-		defer wc.Close()
-		
-		buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + "Subject: Disk utilization warning on " + hostName + "\r\n\r\n" + "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%\r\n")
-		
-		_, eMailErr = buf.WriteTo(wc)
-		if eMailErr != nil {
-		    log_with_timestamp(f, "Failure writing disk notification message DATA")
-		}
+	        send_email_notification(f, "Subject: Disk utilization warning on " + hostName, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
 	    }
-	}
-	
-	
+	}	
     }
     
-    f.Close()
-    
+    f.Close()  
     c.Close()
 }
 
@@ -392,4 +327,32 @@ func log_with_timestamp(f *os.File, s string) {
     stamp := time.Now().Unix()
     fmt.Fprintf(l, "%d: %s\n", stamp, s)
     l.Flush()   
+}
+
+//
+// Send a notification e-mail
+//
+
+func send_email_notification(f *os.File, subj string, body string) {
+    eMailConn, eMailErr := smtp.Dial("localhost:25")
+    if eMailErr != nil {
+        log_with_timestamp(f, "SMTP server connection failure sending notification")
+    }
+		
+    eMailConn.Mail(g_eMailFrom)
+    eMailConn.Rcpt(g_eMailTo)
+		
+    wc, eMailErr := eMailConn.Data()
+    if eMailErr != nil {
+        log_with_timestamp(f, "Failure initiating DATA stage sending notification")
+    }
+		
+    defer wc.Close()
+		
+    buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + subj + "\r\n\r\n" + body + "\r\n")
+		
+    _, eMailErr = buf.WriteTo(wc)
+    if eMailErr != nil {
+        log_with_timestamp(f, "Failure writing notification message DATA")
+    }
 }
