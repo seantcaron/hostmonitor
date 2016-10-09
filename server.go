@@ -9,7 +9,7 @@ import (
     //"io"
     "net"
     "os"
-    "fmt"
+    //"fmt"
     "strings"
     "strconv"
     "bufio"
@@ -19,7 +19,7 @@ import (
     "net/smtp"
     "bytes"
     "log"
-    "time"
+    //"time"
 )
 
 //
@@ -32,10 +32,10 @@ var g_diskThreshold int64
 
 func main() {
 
-    var bindaddr, conffile, logfile string
+    var bindaddr, conffile string
 
-    if (len(os.Args) != 7) {
-        log.Fatalf("Usage: %s -b bindaddr -f configfile -l logfile", os.Args[0])
+    if (len(os.Args) != 5) {
+        log.Fatalf("Usage: %s -b bindaddr -f configfile", os.Args[0])
     }
 
     for i := 1; i < len(os.Args); i++ {
@@ -44,22 +44,10 @@ func main() {
 	        bindaddr = os.Args[i+1]
             case "-f":
 	        conffile = os.Args[i+1]
-            case "-l":
-	        logfile = os.Args[i+1]
         }
     }
 
-    //
-    // Open log file
-    //
-    
-    logFile, err := os.Create(logfile)
-    
-    if err != nil {
-        log.Fatalf("Failed opening log file for writing\n")
-    }
-    
-    log_with_timestamp(logFile, "Host monitor data server starting up")
+    log.Printf("Host monitor data server starting up\n")
     
     //
     // Read in the configuration file.
@@ -70,8 +58,6 @@ func main() {
     confFile, err := os.Open(conffile)
     
     if err != nil {
-        log_with_timestamp(logFile, "Failed opening configuration file for reading")
-        logFile.Close()
         log.Fatalf("Failed opening configuration file for reading\n")
     }
     
@@ -110,7 +96,7 @@ func main() {
 	        case "diskthreshold":
 	            g_diskThreshold, _ = strconv.ParseInt(theFields[1], 10, 64)
 	        default:
-	            log_with_timestamp(logFile, "Ignoring nonsense configuration parameter " + theFields[1])
+		    log.Printf("Ignoring nonsense configuration parameter %s\n", theFields[1])
             }
 	}
     }
@@ -132,16 +118,14 @@ func main() {
 	(haveParam["loadFirstDThreshold"] != true) ||
 	(haveParam["swapFirstDThreshold"] != true) ||
 	(haveParam["diskThreshold"] != true)) {
-	log_with_timestamp(logFile, "Fatal missing configuration directive")
-	logFile.Close()
 	log.Fatalf("Fatal missing configuration directive\n")
     }
-    
-    log_with_timestamp(logFile, "Configuration report follows")
-    log_with_timestamp(logFile, "  DB user: " + g_dbUser + " DB host: " + g_dbHost + " DB name: " + g_dbName)
-    log_with_timestamp(logFile, "  E-mail to: " + g_eMailTo + " E-mail from: " + g_eMailFrom)
-    log_with_timestamp(logFile, fmt.Sprintf("  Thresholds: %f %f %f %f %d", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold))
-    log_with_timestamp(logFile, "Configuration report ends")
+
+    log.Printf("Configuration report follows\n")
+    log.Printf("  DB user: %s DB host: %s DB name: %s\n", g_dbUser, g_dbHost, g_dbName)
+    log.Printf("  E-mail to: %s E-mail from: %s\n", g_eMailTo, g_eMailFrom)
+    log.Printf("  Thresholds: %f %f %f %f %d\n", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)
+    log.Printf("Configuration report ends\n")
     
     //
     // Start listening for connections
@@ -149,8 +133,6 @@ func main() {
     
     listener, err := net.Listen("tcp", bindaddr + ":5962")
     if err != nil {
-        log_with_timestamp(logFile, "Failure calling net.Listen()")
-	logFile.Close()
 	log.Fatalf("Failure calling net.Listen()\n")
     }
     
@@ -161,11 +143,11 @@ func main() {
     for {
         conn, err := listener.Accept()
 	if err != nil {
-	    log_with_timestamp(logFile, "Non zero value returned by listener.Accept()")
+	    log.Printf("Non-zero value returned by listener.Accept()\n")
 	    continue
 	}
 	
-	go handle_connection(conn, logFile)
+	go handle_connection(conn)
     }
 }
 
@@ -185,9 +167,7 @@ func main() {
 //    loadfive varchar(12), loadfifteen varchar(12), swapused varchar(12), diskreport varchar(68));
 //
 
-
-
-func handle_connection(c net.Conn, f *os.File) {
+func handle_connection(c net.Conn) {
 
     var myDSN string;
     
@@ -196,7 +176,7 @@ func handle_connection(c net.Conn, f *os.File) {
     for input.Scan() {
     
         inp := input.Text()
-	
+
 	data := strings.Split(inp, ",")
 	
 	timeStamp := data[0]
@@ -223,9 +203,7 @@ func handle_connection(c net.Conn, f *os.File) {
         dbconn, dbConnErr := sql.Open("mysql", myDSN)
 	
 	if dbConnErr != nil {
-	    log_with_timestamp(f, "Error connecting to database")
-	    f.Close()
-	    os.Exit(1)
+	    log.Fatalf("Fatal connecting to database\n")
 	}
 	
 	//
@@ -234,11 +212,9 @@ func handle_connection(c net.Conn, f *os.File) {
 	
 	dbPingErr := dbconn.Ping()
 	if dbPingErr != nil {
-	    log_with_timestamp(f, "Error attempting to ping database connection")
-	    f.Close()
-	    os.Exit(1)
+	    log.Fatalf("Fatal attempting to ping database\n")
 	}
-	
+
 	//
 	// Retrieve the previous set of data points acquired for this host from the database.
 	//
@@ -256,18 +232,15 @@ func handle_connection(c net.Conn, f *os.File) {
 	var dbTimeStamp, dbHostName, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
 	
 	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
-	
-	switch {
+
+        switch {
 	    // If this happens, first database entry for the host in question
 	    case queryErr == sql.ErrNoRows:
-	        log_with_timestamp(f, "No rows returned executing SELECT for host " + hostName)
+	        log.Printf("No rows returned executing SELECT for host %s\n", hostName)
 	    case queryErr != nil:
-	        log_with_timestamp(f, "Some other error occurred executing SELECT for host " + hostName)
-		f.Close()
-		dbconn.Close()
-		os.Exit(1)
+	        dbconn.Close()
+	        log.Fatalf("Fatal attempting to execute SELECT for host %s\n", hostName)
 	    default:
-	        continue
 	}
 
         //
@@ -275,13 +248,11 @@ func handle_connection(c net.Conn, f *os.File) {
 	//
 	
 	dbCmd = "INSERT INTO reports VALUES (" + timeStamp + ",'" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
-	
+
 	_, dbExecErr := dbconn.Exec(dbCmd)
 	if dbExecErr != nil {
-	    log_with_timestamp(f, "Failure executing INSERT for host " + hostName)
-	    f.Close()
 	    dbconn.Close()
-	    os.Exit(1)
+	    log.Fatalf("Fatal executing INSERT for host %s\n", hostName)
 	}
 	
 	dbconn.Close()
@@ -304,7 +275,7 @@ func handle_connection(c net.Conn, f *os.File) {
 	//
 		
 	if ((loadOneF > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
-	    send_email_notification(f, "Subject: System load warning on " + hostName, "System load has reached " + loadOne)
+	    send_email_notification("Subject: System load warning on " + hostName, "System load has reached " + loadOne)
 	}
 	
         //
@@ -312,7 +283,7 @@ func handle_connection(c net.Conn, f *os.File) {
 	//
 	
 	if ((swapPctUsedF > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
-	    send_email_notification(f, "Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "%")	
+	    send_email_notification("Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "%")	
 	}
 	
         //
@@ -326,35 +297,22 @@ func handle_connection(c net.Conn, f *os.File) {
 	    valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 	    
 	    if valueToTest >= g_diskThreshold {
-	        send_email_notification(f, "Subject: Disk utilization warning on " + hostName, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
+	        send_email_notification("Subject: Disk utilization warning on " + hostName, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
 	    }
 	}	
     }
     
-    f.Close()  
     c.Close()
-}
-
-//
-// Write a message to the server log with a timestamp
-//
-
-func log_with_timestamp(f *os.File, s string) {
-    l := bufio.NewWriter(f)
-    
-    stamp := time.Now().Unix()
-    fmt.Fprintf(l, "%d: %s\n", stamp, s)
-    l.Flush()   
 }
 
 //
 // Send a notification e-mail
 //
 
-func send_email_notification(f *os.File, subj string, body string) {
+func send_email_notification(subj string, body string) {
     eMailConn, eMailErr := smtp.Dial("localhost:25")
     if eMailErr != nil {
-        log_with_timestamp(f, "SMTP server connection failure sending notification")
+        log.Printf("SMTP server connection failure sending notification\n")
     }
 		
     eMailConn.Mail(g_eMailFrom)
@@ -362,7 +320,7 @@ func send_email_notification(f *os.File, subj string, body string) {
 		
     wc, eMailErr := eMailConn.Data()
     if eMailErr != nil {
-        log_with_timestamp(f, "Failure initiating DATA stage sending notification")
+        log.Printf("Failure initiating DATA stage sending notification\n")
     }
 		
     defer wc.Close()
@@ -371,6 +329,6 @@ func send_email_notification(f *os.File, subj string, body string) {
 		
     _, eMailErr = buf.WriteTo(wc)
     if eMailErr != nil {
-        log_with_timestamp(f, "Failure writing notification message DATA")
+        log.Printf("Failure writing notification message DATA\n")
     }
 }
