@@ -18,18 +18,22 @@ import (
     "strconv"
     "time"
     "net"
+    "log"
 )
 
 func main() {
 
     var swap_used_pct float64
-    
+
+    if ((len(os.Args) != 3) || (os.Args[1] != "-h")) {
+        log.Fatalf("Usage: %s -h server\n", os.Args[0])
+    }
+
     nc := getNumCPUs()
     
     om, fivm, fifm := getLoadAvgs()
     
     mt, _, st, sf := getMemInfo()
-    
     swap_used_pct = ((float64(st)-float64(sf))/float64(st))*100.0
     
     diskReport := getDiskInfo()
@@ -42,9 +46,9 @@ func main() {
         host = host[0:strings.Index(host, ".")]
     }
         
-    conn, err := net.Dial("tcp", "localhost:5962")
+    conn, err := net.Dial("tcp", os.Args[2]+":5962")
     if err != nil {
-        return
+        log.Fatalf("Error calling net.Dial()")
     }
     
     fmt.Fprintf(conn, "%d,%s,%d,%d,%f,%f,%f,%f,%s\n", timestamp, host, nc, mt, om, fivm, fifm, swap_used_pct, diskReport)
@@ -52,7 +56,9 @@ func main() {
     conn.Close()
 }
 
+//
 // Get number of installed CPUs
+//
 
 func getNumCPUs() int {
 
@@ -80,7 +86,9 @@ func getNumCPUs() int {
     return numCPUs
 }
 
+//
 // Get load averages
+//
 
 func getLoadAvgs() (float64, float64, float64) {
 
@@ -109,7 +117,9 @@ func getLoadAvgs() (float64, float64, float64) {
     return loadOneMin, loadFiveMin, loadFifteenMin
 }
 
+//
 // Get memory and swap information
+//
 
 func getMemInfo() (int64, int64, int64, int64) {
 
@@ -151,7 +161,9 @@ func getMemInfo() (int64, int64, int64, int64) {
     return memTotal, memFree, swapTotal, swapFree   
 }
 
+//
 // Get partition utilization
+//
 
 func getDiskInfo() string {
 
