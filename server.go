@@ -32,11 +32,28 @@ var g_diskThreshold int64
 
 func main() {
 
+    var bindaddr, conffile, logfile string
+
+    if (len(os.Args) != 7) {
+        log.Fatalf("Usage: %s -b bindaddr -f configfile -l logfile", os.Args[0])
+    }
+
+    for i := 1; i < len(os.Args); i++ {
+        switch os.Args[i] {
+	    case "-b":
+	        bindaddr = os.Args[i+1]
+            case "-f":
+	        conffile = os.Args[i+1]
+            case "-l":
+	        logfile = os.Args[i+1]
+        }
+    }
+
     //
     // Open log file
     //
     
-    logFile, err := os.Create("/var/log/hostmonitor.log")
+    logFile, err := os.Create(logfile)
     
     if err != nil {
         log.Fatalf("Failed opening log file for writing\n")
@@ -50,7 +67,7 @@ func main() {
     
     haveParam := make(map[string]bool)
     
-    confFile, err := os.Open("/etc/hostmonitor/server.conf")
+    confFile, err := os.Open(conffile)
     
     if err != nil {
         log_with_timestamp(logFile, "Failed opening configuration file for reading")
@@ -129,7 +146,7 @@ func main() {
     // Start listening for connections
     //
     
-    listener, err := net.Listen("tcp", "localhost:5962")
+    listener, err := net.Listen("tcp", bindaddr + ":5962")
     if err != nil {
         log_with_timestamp(logFile, "Failure calling net.Listen()")
 	logFile.Close()
