@@ -20,6 +20,10 @@ collects the following data points:
 A server runs on a central collection point and accepts connections from the
 agent. Reports are read in, tokenized and written to a MySQL database.
 
+A separate hosts table is maintained, a record is created for each host that
+checks in with the collection point. Having a list of all hosts facilitates
+reporting.
+
 The server looks at the current and historic data in each host thread and will
 send notification e-mails to a specified address based on three criterion:
 
@@ -27,13 +31,21 @@ send notification e-mails to a specified address based on three criterion:
 * Swap utilization exceeds threshold
 * Disk utilization on any reported partition exceeds threshold
 
-A separate app will be implemented to, for example, prepare a Web dashboard from
-the contents of the database.
+A separate dashboard writtein in Python iterates through the host table and
+for each host, prints the most recent available report in tabular format.
 
-The following SQL will build the host table:
+The following SQL will build the reports table:
 
 ```
 CREATE TABLE reports (timestamp bigint, hostname varchar(68), numcpus varchar(8),
   physmem varchar(16), loadone varchar(12), loadfive varchar(12),
   loadfifteen varchar(12), swapused varchar(12), diskreport varchar(68));
 ```
+
+The following SQL will build the hosts table:
+
+```
+CREATE TABLE hosts (host varchar(258), hostid integer NOT NULL AUTO_INCREMENT
+  PRIMARY KEY);
+```
+
