@@ -8,14 +8,14 @@ import cgi, time, sys, MySQLdb
 print('Content-type: text/html\n')
 print('<html>')
 print('<head>')
-print('<title>Host Mon</title>')
-print('<style type="text/css">* { border-radius: 5px; } h1 { font-family: Arial, Helvetica; } p { font-size: medium; font-weight: bold; font-family: Arial, Helvetica; width: 80%; margin: 10px auto; } table { height: 15%; margin: 10px auto; width: 80%; } td { 0px; font-family: Courier; }</style>')
+print('<title>Host Monitor</title>')
+print('<style type="text/css">* { border-radius: 5px; } h1 { font-family: Arial, Helvetica; } p { font-size: medium; font-weight: bold; font-family: Arial, Helvetica; width: 80%; margin: 10px auto; } table { height: 15%; margin: 10px auto; width: 80%; } th { font-family: Arial, Helvetica; } td { font-family: Courier; }</style>')
 print('</head>')
 print('<body bgcolor=White text=Black vlink=Black text=Black>')
-print('<h1>Host Mon: ' + time.strftime("%A %b %d %H:%m:%S %Z", time.localtime()) + '</h1>')
+print('<h1>Host Monitor: ' + time.strftime("%A %b %d %H:%m:%S %Z", time.localtime()) + '</h1>')
 
 print('<table>')
-print('<tr><th>Host name</th><th>Threads</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used</th><th>Disk report</th></tr>')
+print('<tr><th>Host name</th><th>Cores</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used (%)</th><th>Disk report (%util)</th></tr>')
 
 db = MySQLdb.connect(user="hostmon",passwd="xyzzy123",db="hostmonitor")
 
