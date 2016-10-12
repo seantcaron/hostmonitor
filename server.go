@@ -31,7 +31,6 @@ var g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThresho
 var g_diskThreshold int64
 
 func main() {
-
     var bindaddr, conffile string
 
     if (len(os.Args) != 5) {
@@ -166,15 +165,15 @@ func main() {
 //  CREATE TABLE reports (timestamp bigint, hostname varchar(68), numcpus varchar(8), physmem varchar(16), loadone varchar(12),
 //    loadfive varchar(12), loadfifteen varchar(12), swapused varchar(12), diskreport varchar(68));
 //
+//  CREATE TABLE hosts (host varchar(258), hostid integer NOT NULL AUTO_INCREMENT PRIMARY KEY);
+//
 
 func handle_connection(c net.Conn) {
-
     var myDSN string;
     
     input := bufio.NewScanner(c)
     
     for input.Scan() {
-    
         inp := input.Text()
 
 	data := strings.Split(inp, ",")
@@ -195,11 +194,7 @@ func handle_connection(c net.Conn) {
 	//
 	
         myDSN = g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
-    
-        //logTimeStamp := time.Now().Unix()
-        //fmt.Fprintf(log, "%d: Attempting to connect with DSN: %s\n", logTimeStamp, myDSN)
-	//log.Flush()
-	
+
         dbconn, dbConnErr := sql.Open("mysql", myDSN)
 	
 	if dbConnErr != nil {
@@ -215,20 +210,46 @@ func handle_connection(c net.Conn) {
 	    log.Fatalf("Fatal attempting to ping database\n")
 	}
 
+        //
+	// Check to see if the host exists in the host tracking table
 	//
-	// Retrieve the previous set of data points acquired for this host from the database.
-	//
-	
-	dbCmd := "SELECT * from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
 
-        // I guess we can't use SELECT * with QueryRow, we need to SELECT a particular field from the row otherwise
-	//  we will get an error, attempting to execute the QueryRow statement.
-	// (We can, but we have to specify the correct number of fields in the Scan() call. If we only select one
-	//  parameter, it works fine if we only specify one parameter to the Scan() function)
+        dbCmd := "SELECT COUNT(*) FROM hosts where host = '" + hostName + "';"
+	_, dbExecErr := dbconn.Exec(dbCmd)
+	if dbExecErr != nil {
+	    log.Fatalf("Failed executing SELECT for host " + hostName)
+        }
+
+	var hostp string
+	_ = dbconn.QueryRow(dbCmd).Scan(&hostp)
+	hostpi, _ := strconv.Atoi(hostp)
+
 	//
-	// We know how many fields we have up front, and we just specify N parameters to QueryRow().Scan() i.e.
-	//  db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
+	// If not, add it to the hosts table. MySQL will generate an ID
+	//
+
+        if (hostpi == 0) {
+	    dbCmd = "INSERT INTO hosts (host) VALUES ('" + hostName + "');"
+	    _, dbExecErr = dbconn.Exec(dbCmd)
+	    if dbExecErr != nil {
+	        log.Fatalf("Failed executing INSERT for host " + hostName)
+            }
+	}
+
+        //
+	// Retrieve previous set of data points for this host from the reports
+	//  table
+	//
 	
+	dbCmd = "SELECT * from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
+
+        //
+	// Note regaarding db.QueryRow(): We should know how many fields we
+	//  have in the table. For each field, specify a parameter to the
+	//  QueryRow().Scan() method. i.e.
+	//      db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
+        //
+
 	var dbTimeStamp, dbHostName, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
 	
 	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
@@ -244,12 +265,12 @@ func handle_connection(c net.Conn) {
 	}
 
         //
-	// Insert the newest set of data points acquired for this host into the database.
-	//
+	// Insert the data points from the current report into the database.
+        //
 	
 	dbCmd = "INSERT INTO reports VALUES (" + timeStamp + ",'" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
 
-	_, dbExecErr := dbconn.Exec(dbCmd)
+	_, dbExecErr = dbconn.Exec(dbCmd)
 	if dbExecErr != nil {
 	    dbconn.Close()
 	    log.Fatalf("Fatal executing INSERT for host %s\n", hostName)
