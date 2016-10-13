@@ -232,7 +232,7 @@ func handle_connection(c net.Conn) {
 	    dbCmd = "INSERT INTO hosts (host) VALUES ('" + hostName + "');"
 	    _, dbExecErr = dbconn.Exec(dbCmd)
 	    if dbExecErr != nil {
-	        log.Fatalf("Failed executing INSERT for host " + hostName)
+	        log.Fatalf("Failed executing host table INSERT for host " + hostName)
             }
 	}
 
@@ -273,7 +273,7 @@ func handle_connection(c net.Conn) {
 	_, dbExecErr = dbconn.Exec(dbCmd)
 	if dbExecErr != nil {
 	    dbconn.Close()
-	    log.Fatalf("Fatal executing INSERT for host %s\n", hostName)
+	    log.Fatalf("Fatal executing reports table INSERT for host %s\n", hostName)
 	}
 	
 	dbconn.Close()
