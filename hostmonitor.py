@@ -9,7 +9,7 @@ print('Content-type: text/html\n')
 print('<html>')
 print('<head>')
 print('<title>Host Monitor</title>')
-print('<style type="text/css">* { border-radius: 5px; } h1 { font-family: Arial, Helvetica; } p { font-size: medium; font-weight: bold; font-family: Arial, Helvetica; width: 80%; margin: 10px auto; } table { height: 15%; margin: 10px auto; width: 80%; } th { font-family: Arial, Helvetica; } td { font-family: Courier; }</style>')
+print('<style type="text/css">* { border-radius: 5px; } h1 { font-family: Arial, Helvetica; } p { font-size: small; font-weight: bold; font-family: Arial, Helvetica; width: 80%; margin: 10px auto; } table { height: 15%; margin: 10px auto; width: 80%; } th { font-family: Arial, Helvetica; } td { font-family: Courier; }</style>')
 print('</head>')
 print('<body bgcolor=White text=Black vlink=Black text=Black>')
 print('<h1>Host Monitor: ' + time.strftime("%A %b %d %H:%m:%S %Z", time.localtime()) + '</h1>')
@@ -26,6 +26,9 @@ curs.execute(query)
 hosts = curs.fetchall()
 
 toggle = 0
+
+tcores = 0
+tphysmem = 0
 
 for host in hosts:
     query = 'SELECT * FROM reports WHERE hostname = \'' + host[0] + '\' ORDER BY timestamp DESC LIMIT 1;'
@@ -56,13 +59,17 @@ for host in hosts:
 	print('</td><td>')
 	print(row[8])
         print('</td></tr>')
- 
+
+        tcores = tcores + int(row[2])
+        tphysmem = tphysmem + int(row[3])
+
     toggle = not toggle
 
 # We need to commit() the query on inserts and modifies after execution before they actually take effect
 # db.commit()
 
 print('</table>')
+print('<p>Total cores ' + str(tcores) + ', total physical memory ' + str(tphysmem) + ' kB</p>')
 print('</body>')
 print('</html>')
 
