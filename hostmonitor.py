@@ -29,6 +29,7 @@ toggle = 0
 
 tcores = 0
 tphysmem = 0
+thosts = 0
 
 for host in hosts:
     query = 'SELECT * FROM reports WHERE hostname = \'' + host[0] + '\' ORDER BY timestamp DESC LIMIT 1;'
@@ -72,7 +73,7 @@ for host in hosts:
 
         if float(row[6]) > float(row[2]):
 	    print('<td bgcolor=#ffb3b3>')
-        elif float(row[6]) > float(row[6])/2.0:
+        elif float(row[6]) > float(row[2])/2.0:
 	    print('<td bgcolor=#ffffb3>')
 	else:
 	    print('<td>')
@@ -94,11 +95,12 @@ for host in hosts:
 
         tcores = tcores + int(row[2])
         tphysmem = tphysmem + int(row[3])
+        thosts = thosts + 1
 
     toggle = not toggle
 
 print('</table>')
-print('<p>Total cores ' + str(tcores) + ', total physical memory ' + str(tphysmem) + ' kB</p>')
+print('<p>' + str(thosts) + ' total hosts, ' + str(tcores) + ' total cores, ' + str(tphysmem) + ' kB total physical memory</p>')
 print('</body>')
 print('</html>')
 
