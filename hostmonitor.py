@@ -48,13 +48,45 @@ for host in hosts:
         print(row[2])
         print('</td><td>')
         print(row[3])
-        print('</td><td>')
+        print('</td>')
+
+	if float(row[4]) > float(row[2]):
+	    print('<td bgcolor=#ffb3b3>')
+	elif float(row[4]) > float(row[2])/2.0:
+	    print('<td bgcolor=#ffffb3>')
+        else:
+	    print('<td>')
+
         print(row[4])
-	print('</td><td>')
+	print('</td>')
+
+        if float(row[5]) > float(row[2]):
+	    print('<td bgcolor=#ffb3b3>')
+        elif float(row[5]) > float(row[2])/2.0:
+	    print('<td bgcolor=#ffffb3>')
+	else:
+	    print('<td>')
+
 	print(row[5])
-	print('</td><td>')
+	print('</td>')
+
+        if float(row[6]) > float(row[2]):
+	    print('<td bgcolor=#ffb3b3>')
+        elif float(row[6]) > float(row[6])/2.0:
+	    print('<td bgcolor=#ffffb3>')
+	else:
+	    print('<td>')
+
 	print(row[6])
-	print('</td><td>')
+	print('</td>')
+
+	if float(row[7]) > 66.0:
+	    print('<td bgcolor=#ffb3b3>')
+	elif float(row[7]) > 10.0:
+	    print('<td bgcolor=#ffffb3>')
+	else:
+	    print('<td>')
+
 	print(row[7])
 	print('</td><td>')
 	print(row[8])
@@ -64,9 +96,6 @@ for host in hosts:
         tphysmem = tphysmem + int(row[3])
 
     toggle = not toggle
-
-# We need to commit() the query on inserts and modifies after execution before they actually take effect
-# db.commit()
 
 print('</table>')
 print('<p>Total cores ' + str(tcores) + ', total physical memory ' + str(tphysmem) + ' kB</p>')
