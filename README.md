@@ -49,3 +49,26 @@ CREATE TABLE hosts (host varchar(258), hostid integer NOT NULL AUTO_INCREMENT
   PRIMARY KEY);
 ```
 
+To install the host monitor on the server, configure a database, create a directory
+to host the configuration file, tune the configuration file as desired. For now, we
+can start the server interactively with a command like:
+
+```
+nohup ./hostmon_server -b addr -f /path/to/config.conf 2>&1 > /var/log/hostmon.log &
+```
+
+Or from /etc/rc.local using simply:
+
+```
+/path/to/hostmon_server -b addr -f /path/to/config.conf 2>&1 > /var/log/hostmon.log &
+```
+
+On each client, edit cron and insert a line similar to the following:
+
+```
+0,10,20,30,40,50       *       *       *       *       /path/to/hostmon_agent -h addr
+```
+
+The frequency can be set at any value, of course, excessively frequent collection will
+result in a large amount of data!
+
