@@ -21,7 +21,7 @@ db = MySQLdb.connect(user="hostmon",passwd="xyzzy123",db="hostmonitor")
 
 curs = db.cursor()
 
-query = 'SELECT host from hosts;'
+query = 'SELECT host FROM hosts ORDER BY host ASC;'
 curs.execute(query)
 hosts = curs.fetchall()
 
