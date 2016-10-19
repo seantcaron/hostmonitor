@@ -312,7 +312,7 @@ func handle_connection(c net.Conn) {
 	    // Test to try and rate limit disk notifications down to hourly
 	    //
 
-	    if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[hostName])) >= 3600)) {
+	    if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[hostName])) >= 86400)) {
 	        send_email_notification("Subject: Disk utilization warning on " + hostName, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
 		lastDNotify[hostName] = time.Now().Unix()
 	    }
