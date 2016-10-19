@@ -19,7 +19,7 @@ import (
     "net/smtp"
     "bytes"
     "log"
-    //"time"
+    "time"
 )
 
 //
@@ -29,6 +29,8 @@ import (
 var g_dbUser, g_dbPass, g_dbHost, g_dbName, g_eMailTo, g_eMailFrom string
 var g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold float64
 var g_diskThreshold int64
+
+var lastDNotify map[string]int64
 
 func main() {
     var bindaddr, conffile string
@@ -306,8 +308,13 @@ func handle_connection(c net.Conn) {
 	for i := 0; i < len(diskReptComponents)-1; i++ {
 	    valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 	    
-	    if valueToTest >= g_diskThreshold {
+	    //
+	    // Test to try and rate limit disk notifications down to hourly
+	    //
+
+	    if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[hostName])) >= 3600)) {
 	        send_email_notification("Subject: Disk utilization warning on " + hostName, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
+		lastDNotify[hostName] = time.Now().Unix()
 	    }
 	}	
     }
