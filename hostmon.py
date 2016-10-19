@@ -24,8 +24,9 @@ cfg.read('/etc/hostmonitor/dashboard.ini')
 dbuser = cfg.get('database', 'user')
 dbpass = cfg.get('database', 'passwd')
 dbname = cfg.get('database', 'db')
+dbhost = cfg.get('database', 'host')
 
-db = MySQLdb.connect(user=dbuser,passwd=dbpass,db=dbname)
+db = MySQLdb.connect(host=dbhost,user=dbuser,passwd=dbpass,db=dbname)
 
 curs = db.cursor()
 
