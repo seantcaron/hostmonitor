@@ -3,7 +3,7 @@
 # Pull data from the Host Mon database and generate the Web dashboard
 #  Sean Caron (scaron@umich.edu)
 
-import cgi, time, sys, MySQLdb
+import cgi, time, sys, MySQLdb, ConfigParser
 
 print('Content-type: text/html\n')
 print('<html>')
@@ -18,7 +18,14 @@ print('<h1>Host Mon: ' + time.strftime("%A %b %d %H:%M:%S %Z", time.localtime())
 print('<table>')
 print('<tr><th>Host name</th><th>Cores</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used (%)</th><th>Disk report (%util)</th></tr>')
 
-db = MySQLdb.connect(user="hostmon",passwd="xyzzy123",db="hostmonitor")
+cfg = ConfigParser.ConfigParser()
+cfg.read('/etc/hostmonitor/dashboard.ini')
+
+dbuser = cfg.get('database', 'user')
+dbpass = cfg.get('database', 'passwd')
+dbname = cfg.get('database', 'db')
+
+db = MySQLdb.connect(user=dbuser,passwd=dbpass,db=dbname)
 
 curs = db.cursor()
 
