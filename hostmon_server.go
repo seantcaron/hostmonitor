@@ -30,7 +30,7 @@ var g_dbUser, g_dbPass, g_dbHost, g_dbName, g_eMailTo, g_eMailFrom string
 var g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold float64
 var g_diskThreshold int64
 
-var lastDNotify map[string]int64
+var lastDNotify = make(map[string]int64)
 
 func main() {
     var bindaddr, conffile string
