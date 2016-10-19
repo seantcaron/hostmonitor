@@ -285,7 +285,7 @@ func handle_connection(c net.Conn) {
 	//
 		
 	if ((loadOneF > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
-	    send_email_notification("Subject: System load warning on " + hostName, "System load has reached " + loadOne)
+	    send_email_notification("Subject: System load warning on " + hostName, "System load has reached " + loadOne + " from " + dbLoadOne)
 	}
 	
         //
@@ -293,7 +293,7 @@ func handle_connection(c net.Conn) {
 	//
 	
 	if ((swapPctUsedF > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
-	    send_email_notification("Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "%")	
+	    send_email_notification("Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "% from " + dbSwapPctUsed + "%")	
 	}
 	
         //
