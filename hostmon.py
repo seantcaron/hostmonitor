@@ -13,7 +13,7 @@ print('<meta http-equiv="refresh" content="600">')
 print('<style type="text/css">* { border-radius: 5px; } h1 { font-family: Arial, Helvetica; } p { font-size: small; font-weight: bold; font-family: Arial, Helvetica; width: 80%; margin: 10px auto; } table { height: 15%; margin: 10px auto; width: 80%; } th { font-family: Arial, Helvetica; } td { font-family: Courier; }</style>')
 print('</head>')
 print('<body bgcolor=White text=Black vlink=Black text=Black>')
-print('<h1>Host Mon: ' + time.strftime("%A %b %d %H:%m:%S %Z", time.localtime()) + '</h1>')
+print('<h1>Host Mon: ' + time.strftime("%A %b %d %H:%M:%S %Z", time.localtime()) + '</h1>')
 
 print('<table>')
 print('<tr><th>Host name</th><th>Cores</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used (%)</th><th>Disk report (%util)</th></tr>')
