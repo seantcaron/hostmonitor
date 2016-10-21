@@ -28,7 +28,7 @@ import (
 
 var g_dbUser, g_dbPass, g_dbHost, g_dbName, g_eMailTo, g_eMailFrom string
 var g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold float64
-var g_diskThreshold int64
+var g_diskThreshold, g_diskReportInterval int64
 
 var lastDNotify = make(map[string]int64)
 
@@ -96,6 +96,8 @@ func main() {
 	            g_swapFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
 	        case "diskthreshold":
 	            g_diskThreshold, _ = strconv.ParseInt(theFields[1], 10, 64)
+                case "diskreportinterval":
+		    g_diskReportInterval, _ = strconv.ParseInt(theFields[1], 10, 64)
 	        default:
 		    log.Printf("Ignoring nonsense configuration parameter %s\n", theFields[1])
             }
@@ -118,7 +120,8 @@ func main() {
 	(haveParam["swapThreshold"] != true) ||
 	(haveParam["loadFirstDThreshold"] != true) ||
 	(haveParam["swapFirstDThreshold"] != true) ||
-	(haveParam["diskThreshold"] != true)) {
+	(haveParam["diskThreshold"] != true) ||
+	(haveParam["diskReportInterval"] != true)) {
 	log.Fatalf("Fatal missing configuration directive\n")
     }
 
@@ -126,6 +129,8 @@ func main() {
     log.Printf("  DB user: %s DB host: %s DB name: %s\n", g_dbUser, g_dbHost, g_dbName)
     log.Printf("  E-mail to: %s E-mail from: %s\n", g_eMailTo, g_eMailFrom)
     log.Printf("  Thresholds: %f %f %f %f %d\n", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)
+    log.Printf("  Disk report interval: %d sec\n", g_diskReportInterval)
+
     log.Printf("Configuration report ends\n")
     
     //
@@ -283,24 +288,30 @@ func handle_connection(c net.Conn) {
 	swapDifferential := math.Abs(dbSwapPctUsedF-swapPctUsedF)
 	
 	//
-	// Look at system load for this host and send notification if the threshold is exceeded.
+	// Look at system load for this host and send notification if the threshold is exceeded. We only consider situations where the new load is
+	//  greater than the old load to be actionable, no sense in messaging on a load DECREASE.
 	//
-		
-	if ((loadOneF > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
-	    send_email_notification("Subject: System load warning on " + hostName, "System load has reached " + loadOne + " from " + dbLoadOne)
+
+        if (loadOneF > dbLoadOneF) {
+	    if ((loadOneF > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
+	        send_email_notification("Subject: System load warning on " + hostName, "System load has reached " + loadOne + " from " + dbLoadOne)
+	    }
+	}
+
+        //
+	// Look at swap utilization for this host and send notification if the threshold is exceeded. Again, we only consider the situation where the
+	//  new swap utilization is greater than the old utilization to be actionable, no sense in messging on swap utilization DECREASE.
+	//
+	
+	if (swapPctUsedF > dbSwapPctUsedF) {
+	    if ((swapPctUsedF > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
+	        send_email_notification("Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "% from " + dbSwapPctUsed + "%")	
+	    }
 	}
 	
         //
-	// Look at swap utilization for this host and send notification if the threshold is exceeded.
-	//
-	
-	if ((swapPctUsedF > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
-	    send_email_notification("Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "% from " + dbSwapPctUsed + "%")	
-	}
-	
-        //
-	// Now let's look at the disk utilization report for this host and send an alert if the threshold
-	// is exceeded.
+	// Now let's look at the disk utilization report for this host and send an alert if the threshold is exceeded. Since disk utilization usually
+	//  varies at a much slower rate than system load or swap consumption, we notify for disk only at specified intervals, not every run.
 	//
 	
         diskReptComponents := strings.Fields(diskReport)
@@ -308,11 +319,7 @@ func handle_connection(c net.Conn) {
 	for i := 0; i < len(diskReptComponents)-1; i++ {
 	    valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 	    
-	    //
-	    // Test to try and rate limit disk notifications down to hourly
-	    //
-
-	    if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[hostName])) >= 86400)) {
+	    if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[hostName])) >= float64(g_diskReportInterval))) {
 	        send_email_notification("Subject: Disk utilization warning on " + hostName, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
 		lastDNotify[hostName] = time.Now().Unix()
 	    }
