@@ -39,7 +39,8 @@ The following SQL will build the reports table:
 ```
 CREATE TABLE reports (timestamp bigint, hostname varchar(68), numcpus varchar(8),
   physmem varchar(16), loadone varchar(12), loadfive varchar(12),
-  loadfifteen varchar(12), swapused varchar(12), diskreport varchar(68));
+  loadfifteen varchar(12), swapused varchar(12), kernelver varchar(65),
+  uptime varchar(16), iskreport varchar(68));
 ```
 
 The following SQL will build the hosts table:
@@ -49,9 +50,7 @@ CREATE TABLE hosts (host varchar(258), hostid integer NOT NULL AUTO_INCREMENT
   PRIMARY KEY);
 ```
 
-To install the host monitor on the server, configure a database, create a directory
-to host the configuration file, tune the configuration file as desired. For now, we
-can start the server interactively with a command like:
+To install the host monitor on the server, configure a database, create a directory to host the configuration file, tune the configuration file as desired. For now, we can start the server interactively with a command like:
 
 ```
 nohup ./hostmon_server -b addr -f /path/to/config.conf 2>&1 > /var/log/hostmon.log &
@@ -69,6 +68,5 @@ On each client, edit cron and insert a line similar to the following:
 0,10,20,30,40,50       *       *       *       *       /path/to/hostmon_agent -h addr
 ```
 
-The frequency can be set at any value, of course, excessively frequent collection will
-result in a large amount of data!
+The frequency can be set at any value, of course, excessively frequent collection will result in a large amount of data!
 
