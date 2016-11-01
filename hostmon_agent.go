@@ -2,11 +2,6 @@
 // Host monitor agent, Sean Caron, scaron@umich.edu
 //
 
-//
-// format of data transmission to server:
-//  timestamp:hostname:num_cpus:memtotal:onemin:fivemin:fifteenmin:swap_pct:disk1,disk1_pct,disk2,disk2_pct,...
-//
-
 package main
 
 import (
@@ -19,39 +14,65 @@ import (
     "time"
     "net"
     "log"
+    "encoding/json"
 )
 
-func main() {
+type Message struct {
+    Timestamp int64
+    Hostname string
+    NumCPUs int64
+    Memtotal int64
+    LoadOne float64
+    LoadFive float64
+    LoadFifteen float64
+    SwapUsed float64
+    KernelVer string
+    Uptime string
+    DiskReport string
+}
 
-    var swap_used_pct float64
+
+func main() {
+    var m Message
 
     if ((len(os.Args) != 3) || (os.Args[1] != "-h")) {
         log.Fatalf("Usage: %s -h server\n", os.Args[0])
     }
 
-    nc := getNumCPUs()
-    
-    om, fivm, fifm := getLoadAvgs()
-    
+    m.NumCPUs = getNumCPUs()
+
+    m.LoadOne, m.LoadFive, m.LoadFifteen = getLoadAvgs()
+
+    m.KernelVer = getKernelVer()
+
+    m.Uptime = getUptime()
+
     mt, _, st, sf := getMemInfo()
-    swap_used_pct = ((float64(st)-float64(sf))/float64(st))*100.0
-    
-    diskReport := getDiskInfo()
-    
-    timestamp := time.Now().Unix()
-    
-    host, _ := os.Hostname()
-    
-    if (strings.Index(host, ".") != -1) {
-        host = host[0:strings.Index(host, ".")]
+    m.Memtotal = mt
+    m.SwapUsed = ((float64(st)-float64(sf))/float64(st))*100.0
+
+    m.DiskReport = getDiskInfo()
+
+    m.Timestamp = time.Now().Unix()
+
+    m.Hostname, _ = os.Hostname()
+
+    if (strings.Index(m.Hostname, ".") != -1) {
+        m.Hostname = m.Hostname[0:strings.Index(m.Hostname, ".")]
     }
         
     conn, err := net.Dial("tcp", os.Args[2]+":5962")
     if err != nil {
         log.Fatalf("Error calling net.Dial()")
     }
-    
-    fmt.Fprintf(conn, "%d,%s,%d,%d,%f,%f,%f,%f,%s\n", timestamp, host, nc, mt, om, fivm, fifm, swap_used_pct, diskReport)
+
+    rpt, err := json.Marshal(m)
+
+    if (err != nil) {
+        log.Fatalf("Error attempting to marshal JSON")
+    }
+
+    fmt.Fprintf(conn, "%s\n", rpt)
     
     conn.Close()
 }
@@ -60,9 +81,9 @@ func main() {
 // Get number of installed CPUs
 //
 
-func getNumCPUs() int {
+func getNumCPUs() int64 {
 
-    var numCPUs int
+    var numCPUs int64
     
     f,err := os.Open("/proc/cpuinfo")
 
@@ -115,6 +136,50 @@ func getLoadAvgs() (float64, float64, float64) {
     f.Close()
     
     return loadOneMin, loadFiveMin, loadFifteenMin
+}
+
+//
+// Get kernel version
+//
+
+func getKernelVer() (string) {
+    f, err := os.Open("/proc/version")
+
+    if (err != nil) {
+        return "unknown"
+    }
+
+    input := bufio.NewScanner(f)
+    input.Scan()
+    inp := input.Text()
+
+    vt := strings.Fields(inp)
+
+    f.Close()
+
+    return vt[2]
+}
+
+//
+// Get uptime
+//
+
+func getUptime() (string) {
+    f, err := os.Open("/proc/uptime")
+
+    if (err != nil) {
+        return "unknown"
+    }
+
+    input := bufio.NewScanner(f)
+    input.Scan()
+    inp := input.Text()
+
+    u := strings.Fields(inp)
+
+    f.Close()
+
+    return u[0]
 }
 
 //
