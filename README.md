@@ -40,7 +40,7 @@ The following SQL will build the reports table:
 CREATE TABLE reports (timestamp bigint, hostname varchar(68), numcpus varchar(8),
   physmem varchar(16), loadone varchar(12), loadfive varchar(12),
   loadfifteen varchar(12), swapused varchar(12), kernelver varchar(65),
-  uptime varchar(16), iskreport varchar(68));
+  uptime varchar(16), diskreport varchar(68));
 ```
 
 The following SQL will build the hosts table:
