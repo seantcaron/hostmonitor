@@ -64,9 +64,9 @@ for host in hosts:
         print(row[5])
         print('</td>')
 
-	if float(row[6]) > float(row[2]):
+	if float(row[6]) > float(row[4]):
 	    print('<td bgcolor=#ffb3b3>')
-	elif float(row[6]) > float(row[2])/2.0:
+	elif float(row[6]) > float(row[4])/2.0:
 	    print('<td bgcolor=#ffffb3>')
         else:
 	    print('<td>')
