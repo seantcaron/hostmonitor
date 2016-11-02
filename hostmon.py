@@ -16,7 +16,7 @@ print('<body bgcolor=White text=Black vlink=Black text=Black>')
 print('<h1>Host Mon: ' + time.strftime("%A %b %d %H:%M:%S %Z", time.localtime()) + '</h1>')
 
 print('<table>')
-print('<tr><th>Host name</th><th>Cores</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used (%)</th><th>Disk report (%util)</th></tr>')
+print('<tr><th>Host name</th><th>Kernel</th><th>Uptime</th><th>Cores</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used (%)</th><th>Disk report (%util)</th></tr>')
 
 cfg = ConfigParser.ConfigParser()
 cfg.read('/etc/hostmonitor/dashboard.ini')
@@ -55,55 +55,59 @@ for host in hosts:
     
         print(row[1])
         print('</td><td>')
-        print(row[2])
+	print(row[2])
+	print('</td><td>')
+	print(row[3])
+	print('</td><td>')
+        print(row[4])
         print('</td><td>')
-        print(row[3])
+        print(row[5])
         print('</td>')
 
-	if float(row[4]) > float(row[2]):
+	if float(row[6]) > float(row[2]):
 	    print('<td bgcolor=#ffb3b3>')
-	elif float(row[4]) > float(row[2])/2.0:
+	elif float(row[6]) > float(row[2])/2.0:
 	    print('<td bgcolor=#ffffb3>')
         else:
 	    print('<td>')
 
-        print(row[4])
+        print(row[6])
 	print('</td>')
 
-        if float(row[5]) > float(row[2]):
+        if float(row[7]) > float(row[4]):
 	    print('<td bgcolor=#ffb3b3>')
-        elif float(row[5]) > float(row[2])/2.0:
-	    print('<td bgcolor=#ffffb3>')
-	else:
-	    print('<td>')
-
-	print(row[5])
-	print('</td>')
-
-        if float(row[6]) > float(row[2]):
-	    print('<td bgcolor=#ffb3b3>')
-        elif float(row[6]) > float(row[2])/2.0:
-	    print('<td bgcolor=#ffffb3>')
-	else:
-	    print('<td>')
-
-	print(row[6])
-	print('</td>')
-
-	if float(row[7]) > 66.0:
-	    print('<td bgcolor=#ffb3b3>')
-	elif float(row[7]) > 10.0:
+        elif float(row[7]) > float(row[4])/2.0:
 	    print('<td bgcolor=#ffffb3>')
 	else:
 	    print('<td>')
 
 	print(row[7])
-	print('</td><td>')
+	print('</td>')
+
+        if float(row[8]) > float(row[4]):
+	    print('<td bgcolor=#ffb3b3>')
+        elif float(row[8]) > float(row[4])/2.0:
+	    print('<td bgcolor=#ffffb3>')
+	else:
+	    print('<td>')
+
 	print(row[8])
+	print('</td>')
+
+	if float(row[9]) > 66.0:
+	    print('<td bgcolor=#ffb3b3>')
+	elif float(row[9]) > 10.0:
+	    print('<td bgcolor=#ffffb3>')
+	else:
+	    print('<td>')
+
+	print(row[9])
+	print('</td><td>')
+	print(row[10])
         print('</td></tr>')
 
-        tcores = tcores + int(row[2])
-        tphysmem = tphysmem + int(row[3])
+        tcores = tcores + int(row[4])
+        tphysmem = tphysmem + int(row[5])
         thosts = thosts + 1
 
     toggle = not toggle
