@@ -57,7 +57,13 @@ for host in hosts:
         print('</td><td>')
 	print(row[2])
 	print('</td><td>')
-	print(row[3])
+
+	#print(row[3])
+	h = int(round(float(row[3])/3600))
+	m = int(round(float(row[3])%3600/60))
+	s = int(round(float(row[3])%60))
+        print(str(h) + ":" + str(m) + ":" + str(s))
+
 	print('</td><td>')
         print(row[4])
         print('</td><td>')
