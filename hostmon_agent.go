@@ -82,7 +82,6 @@ func main() {
 //
 
 func getNumCPUs() int64 {
-
     var numCPUs int64
     
     f,err := os.Open("/proc/cpuinfo")
@@ -112,7 +111,6 @@ func getNumCPUs() int64 {
 //
 
 func getLoadAvgs() (float64, float64, float64) {
-
     var loadOneMin, loadFiveMin, loadFifteenMin float64
     
     f,err := os.Open("/proc/loadavg")
@@ -187,7 +185,6 @@ func getUptime() (string) {
 //
 
 func getMemInfo() (int64, int64, int64, int64) {
-
     var memTotal, memFree, swapTotal, swapFree int64
     
     f, err := os.Open("/proc/meminfo")
@@ -231,7 +228,6 @@ func getMemInfo() (int64, int64, int64, int64) {
 //
 
 func getDiskInfo() string {
-
     var returned string
     
     command := "df"
@@ -256,42 +252,38 @@ func getDiskInfo() string {
     for scanner.Scan() {
         inp := scanner.Text()
 	data := strings.Fields(inp)
-	//fmt.Printf("%s %s\n", data[4], data[5])
 	
 	data[4] = strings.Trim(data[4], "%")
 	
 	if ( data[5] == "/" ) {
-	    //rootUsed := data[4]
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/exports" ) {
-	    //exportsUsed := data[4]
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/incoming" ) {
-	    //incomingUsed := data[4]
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/working" ) {
-	    //workingUsed := data[4]
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
 	if ( data[5] == "/home" ) {
-	    //homeUsed := data[4]
+	    returned = returned + data[5] + " " + data[4] + " "
+	}
+
+        if (data[5] == "/exports/home") {
+	    returned = returned + data[5] + " " + data[4] + " "
+        }
+
+	if (data[5] == "/var") {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
 	
-	if ( data[5] == "/var" ) {
-	    //varUsed := data[4]
-	    returned = returned + data[5] + " " + data[4] + " "
-	}
-	
-	if ( data[5] == "/tmp" ) {
-	    //tmpUsed := data[4]
+	if (data[5] == "/tmp") {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
     }
@@ -305,3 +297,4 @@ func getDiskInfo() string {
     
     return returned
 }
+
