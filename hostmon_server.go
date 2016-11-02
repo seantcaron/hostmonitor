@@ -20,7 +20,36 @@ import (
     "bytes"
     "log"
     "time"
+    "encoding/json"
 )
+
+type Message struct {
+    Timestamp int64
+    Hostname string
+    NumCPUs int64
+    Memtotal int64
+    LoadOne float64
+    LoadFive float64
+    LoadFifteen float64
+    SwapUsed float64
+    KernelVer string
+    Uptime string
+    DiskReport string
+}
+
+type Config struct {
+    DBUser string
+    DBPass string
+    DBName string
+    EMailTo string
+    EMailFrom string
+    LoadThresh float64
+    SwapThresh float64
+    LoadDThresh float64
+    SwapDThresh float64
+    DiskThresh int64
+    DiskRInterval int64
+}
 
 //
 // Configuration parameters go in global variables.
@@ -158,32 +187,24 @@ func main() {
 }
 
 //
-//  CREATE TABLE reports (timestamp bigint, hostname varchar(68), numcpus varchar(8), physmem varchar(16), loadone varchar(12),
-//    loadfive varchar(12), loadfifteen varchar(12), swapused varchar(12), diskreport varchar(68));
-//
-//  CREATE TABLE hosts (host varchar(258), hostid integer NOT NULL AUTO_INCREMENT PRIMARY KEY);
+// Handle a connection from an agent
 //
 
 func handle_connection(c net.Conn) {
-    var myDSN string;
-    
+    var myDSN string
+    var m Message
+
     input := bufio.NewScanner(c)
     
     for input.Scan() {
         inp := input.Text()
 
-	data := strings.Split(inp, ",")
-	
-	timeStamp := data[0]
-	hostName := data[1]
-	numCPUs := data[2]
-	physMem := data[3]
-	loadOne := data[4]
-	loadFive := data[5]
-	loadFifteen := data[6]
-	swapPctUsed := data[7]
-	diskReport := data[8]
-	
+        ins := []byte(inp)
+        err := json.Unmarshal(ins, &m)
+        if (err != nil) {
+	    log.Fatalf("Fatal attempting to unmarshal JSON")
+        }
+
 	//
 	// The DSN used to connect to the database should look like this:
 	//   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
@@ -210,10 +231,10 @@ func handle_connection(c net.Conn) {
 	// Check to see if the host exists in the host tracking table
 	//
 
-        dbCmd := "SELECT COUNT(*) FROM hosts where host = '" + hostName + "';"
+        dbCmd := "SELECT COUNT(*) FROM hosts where host = '" + m.Hostname + "';"
 	_, dbExecErr := dbconn.Exec(dbCmd)
 	if dbExecErr != nil {
-	    log.Fatalf("Failed executing SELECT for host " + hostName)
+	    log.Fatalf("Failed executing SELECT for host " + m.Hostname)
         }
 
 	var hostp string
@@ -225,10 +246,10 @@ func handle_connection(c net.Conn) {
 	//
 
         if (hostpi == 0) {
-	    dbCmd = "INSERT INTO hosts (host) VALUES ('" + hostName + "');"
+	    dbCmd = "INSERT INTO hosts (host) VALUES ('" + m.Hostname + "');"
 	    _, dbExecErr = dbconn.Exec(dbCmd)
 	    if dbExecErr != nil {
-	        log.Fatalf("Failed executing host table INSERT for host " + hostName)
+	        log.Fatalf("Failed executing host table INSERT for host " + m.Hostname)
             }
 	}
 
@@ -237,7 +258,7 @@ func handle_connection(c net.Conn) {
 	//  table
 	//
 	
-	dbCmd = "SELECT * from reports where hostname = '" + hostName + "' ORDER BY timestamp DESC LIMIT 1;"
+	dbCmd = "SELECT * from reports where hostname = '" + m.Hostname + "' ORDER BY timestamp DESC LIMIT 1;"
 
         //
 	// Note regaarding db.QueryRow(): We should know how many fields we
@@ -246,30 +267,30 @@ func handle_connection(c net.Conn) {
 	//      db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
         //
 
-	var dbTimeStamp, dbHostName, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
+	var dbTimeStamp, dbHostName, dbKernelVer, dbUptime, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
 	
-	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
+	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbUptime, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
 
         switch {
 	    // If this happens, first database entry for the host in question
 	    case queryErr == sql.ErrNoRows:
-	        log.Printf("No rows returned executing SELECT for host %s\n", hostName)
+	        log.Printf("No rows returned executing SELECT for host %s\n", m.Hostname)
 	    case queryErr != nil:
 	        dbconn.Close()
-	        log.Fatalf("Fatal attempting to execute SELECT for host %s\n", hostName)
+	        log.Fatalf("Fatal attempting to execute SELECT for host %s\n", m.Hostname)
 	    default:
 	}
 
         //
 	// Insert the data points from the current report into the database.
         //
-	
-	dbCmd = "INSERT INTO reports VALUES (" + timeStamp + ",'" + hostName + "','" + numCPUs + "','" + physMem + "','" + loadOne + "','" + loadFive + "','" + loadFifteen + "','" + swapPctUsed + "','" + diskReport + "');"
+
+	dbCmd = "INSERT INTO reports VALUES (" + strconv.FormatInt(m.Timestamp, 10) + ",'" + m.Hostname + "','" + m.KernelVer + "','" + m.Uptime + "','" + strconv.FormatInt(m.NumCPUs, 10) + "','" + strconv.FormatInt(m.Memtotal, 10) + "','" + strconv.FormatFloat(m.LoadOne, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFive, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFifteen, 'f', 6, 64) + "','" + strconv.FormatFloat(m.SwapUsed, 'f', 6, 64) + "','" + m.DiskReport + "');"
 
 	_, dbExecErr = dbconn.Exec(dbCmd)
 	if dbExecErr != nil {
 	    dbconn.Close()
-	    log.Fatalf("Fatal executing reports table INSERT for host %s\n", hostName)
+	    log.Fatalf("Fatal executing reports table INSERT for host %s\n", m.Hostname)
 	}
 	
 	dbconn.Close()
@@ -280,21 +301,20 @@ func handle_connection(c net.Conn) {
 	//
 	
 	dbLoadOneF,_ := strconv.ParseFloat(dbLoadOne, 64)
-	loadOneF, _ := strconv.ParseFloat(loadOne, 64)
 	dbSwapPctUsedF, _ := strconv.ParseFloat(dbSwapPctUsed, 64)
-	swapPctUsedF, _ := strconv.ParseFloat(swapPctUsed, 64)
 	
-	loadDifferential := math.Abs(dbLoadOneF-loadOneF)
-	swapDifferential := math.Abs(dbSwapPctUsedF-swapPctUsedF)
+	loadDifferential := math.Abs(dbLoadOneF-m.LoadOne)
+	swapDifferential := math.Abs(dbSwapPctUsedF-m.SwapUsed)
 	
 	//
 	// Look at system load for this host and send notification if the threshold is exceeded. We only consider situations where the new load is
 	//  greater than the old load to be actionable, no sense in messaging on a load DECREASE.
 	//
 
-        if (loadOneF > dbLoadOneF) {
-	    if ((loadOneF > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
-	        send_email_notification("Subject: System load warning on " + hostName, "System load has reached " + loadOne + " from " + dbLoadOne)
+        if (m.LoadOne > dbLoadOneF) {
+	    if ((m.LoadOne > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
+	        lo := strconv.FormatFloat(m.LoadOne, 'f', 6, 64)
+	        send_email_notification("Subject: System load warning on " + m.Hostname, "System load has reached " + lo + " from " + dbLoadOne)
 	    }
 	}
 
@@ -303,9 +323,10 @@ func handle_connection(c net.Conn) {
 	//  new swap utilization is greater than the old utilization to be actionable, no sense in messging on swap utilization DECREASE.
 	//
 	
-	if (swapPctUsedF > dbSwapPctUsedF) {
-	    if ((swapPctUsedF > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
-	        send_email_notification("Subject: Swap utilization warning on " + hostName, "Swap utilization has reached " + swapPctUsed + "% from " + dbSwapPctUsed + "%")	
+	if (m.SwapUsed > dbSwapPctUsedF) {
+	    if ((m.SwapUsed > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
+	        su := strconv.FormatFloat(m.SwapUsed, 'f', 6, 64)
+	        send_email_notification("Subject: Swap utilization warning on " + m.Hostname, "Swap utilization has reached " + su + "% from " + dbSwapPctUsed + "%")	
 	    }
 	}
 	
@@ -314,14 +335,14 @@ func handle_connection(c net.Conn) {
 	//  varies at a much slower rate than system load or swap consumption, we notify for disk only at specified intervals, not every run.
 	//
 	
-        diskReptComponents := strings.Fields(diskReport)
+        diskReptComponents := strings.Fields(m.DiskReport)
 	
 	for i := 0; i < len(diskReptComponents)-1; i++ {
 	    valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 	    
-	    if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[hostName])) >= float64(g_diskReportInterval))) {
-	        send_email_notification("Subject: Disk utilization warning on " + hostName, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
-		lastDNotify[hostName] = time.Now().Unix()
+	    if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[m.Hostname])) >= float64(g_diskReportInterval))) {
+	        send_email_notification("Subject: Disk utilization warning on " + m.Hostname, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
+		lastDNotify[m.Hostname] = time.Now().Unix()
 	    }
 	}	
     }
