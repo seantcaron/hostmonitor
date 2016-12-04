@@ -27,6 +27,7 @@ type Message struct {
     LoadFifteen float64
     SwapUsed float64
     KernelVer string
+    Release string
     Uptime string
     DiskReport string
 }
@@ -44,6 +45,7 @@ func main() {
     m.LoadOne, m.LoadFive, m.LoadFifteen = getLoadAvgs()
 
     m.KernelVer = getKernelVer()
+    m.Release = getRelease()
 
     m.Uptime = getUptime()
 
@@ -60,7 +62,7 @@ func main() {
     if (strings.Index(m.Hostname, ".") != -1) {
         m.Hostname = m.Hostname[0:strings.Index(m.Hostname, ".")]
     }
-        
+
     conn, err := net.Dial("tcp", os.Args[2]+":5962")
     if err != nil {
         log.Fatalf("Error calling net.Dial()")
@@ -72,8 +74,9 @@ func main() {
         log.Fatalf("Error attempting to marshal JSON")
     }
 
-    fmt.Fprintf(conn, "%s\n", rpt)
-    
+    //fmt.Fprintf(conn, "%s\n", rpt)
+    fmt.Printf("%s\n", rpt)
+
     conn.Close()
 }
 
@@ -83,7 +86,7 @@ func main() {
 
 func getNumCPUs() int64 {
     var numCPUs int64
-    
+
     f,err := os.Open("/proc/cpuinfo")
 
     if ( err != nil ) {
@@ -91,18 +94,18 @@ func getNumCPUs() int64 {
     }
 
     input := bufio.NewScanner(f)
-    
+
     numCPUs = 0
-    
+
     for input.Scan() {
         inp := input.Text();
 	if (strings.Contains(inp, "processor")) {
 	    numCPUs++
 	}
     }
-    
+
     f.Close()
-    
+
     return numCPUs
 }
 
@@ -112,28 +115,67 @@ func getNumCPUs() int64 {
 
 func getLoadAvgs() (float64, float64, float64) {
     var loadOneMin, loadFiveMin, loadFifteenMin float64
-    
+
     f,err := os.Open("/proc/loadavg")
-    
+
     if ( err != nil ) {
         return 0.0, 0.0, 0.0
     }
-    
+
     input := bufio.NewScanner(f)
-    
+
     input.Scan()
-    
+
     inp := input.Text();
-	
+
     averages := strings.Fields(inp)
-    
+
     loadOneMin, _ = strconv.ParseFloat(averages[0], 64)
     loadFiveMin, _ = strconv.ParseFloat(averages[1], 64)
     loadFifteenMin, _ = strconv.ParseFloat(averages[2], 64)
-    
+
     f.Close()
-    
+
     return loadOneMin, loadFiveMin, loadFifteenMin
+}
+
+//
+// Get release
+//
+
+func getRelease() (string) {
+  var r string
+
+  // Easiest case, Red Hat and derived distributions (i.e. CentOS, Fedora)
+  f, err := os.Open("/etc/redhat-release")
+
+  if (err == nil) {
+    input := bufio.NewScanner(f)
+    input.Scan()
+    r := input.Text()
+    return r
+  } else {
+      // Debian and derived distributions (i.e. Ubuntu) need slightly more processing
+      f, err = os.Open("/etc/os-release")
+
+      if (err != nil) {
+        return "unknown"
+      }
+
+      input := bufio.NewScanner(f)
+      for input.Scan() {
+        inp := input.Text()
+        data := strings.Split(inp, "=")
+        if (data[0] == "PRETTY_NAME") {
+          r = data[1][1:len(data[1])-1]
+          return r
+        }
+      }
+  }
+
+  f.Close()
+
+  return r
 }
 
 //
@@ -186,41 +228,41 @@ func getUptime() (string) {
 
 func getMemInfo() (int64, int64, int64, int64) {
     var memTotal, memFree, swapTotal, swapFree int64
-    
+
     f, err := os.Open("/proc/meminfo")
-    
+
     if ( err != nil ) {
         return 0, 0, 0, 0
     }
-    
+
     input := bufio.NewScanner(f)
-    
+
     for input.Scan() {
         inp := input.Text()
-	
+
 	data := strings.Fields(inp)
-	
+
 	if ( data[0] == "MemTotal:" ) {
 	    memTotal, _ = strconv.ParseInt(data[1], 10, 64)
 	}
-	
+
 	if ( data[0] == "MemFree:" ) {
 	    memFree, _ = strconv.ParseInt(data[1], 10, 64)
 	}
-	
+
 	if ( data[0] == "SwapTotal:" ) {
 	    swapTotal, _ = strconv.ParseInt(data[1], 10, 64)
 	}
-	
+
 	if ( data[0] == "SwapFree:" ) {
 	    swapFree, _ = strconv.ParseInt(data[1], 10, 64)
-	}	
-	
+	}
+
     }
-    
+
     f.Close()
-    
-    return memTotal, memFree, swapTotal, swapFree   
+
+    return memTotal, memFree, swapTotal, swapFree
 }
 
 //
@@ -229,48 +271,48 @@ func getMemInfo() (int64, int64, int64, int64) {
 
 func getDiskInfo() string {
     var returned string
-    
+
     command := "df"
     args := []string{"-k", "-l"}
-    
+
     cmd := exec.Command(command, args...)
-    
+
     reader, err := cmd.StdoutPipe()
     if (err != nil) {
         return ""
     }
-    
+
     err = cmd.Start()
     if (err != nil) {
         return ""
     }
-    
+
     scanner := bufio.NewScanner(reader)
-    
+
     returned = ""
-    
+
     for scanner.Scan() {
         inp := scanner.Text()
 	data := strings.Fields(inp)
-	
+
 	data[4] = strings.Trim(data[4], "%")
-	
+
 	if ( data[5] == "/" ) {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
-	
+
 	if ( data[5] == "/exports" ) {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
-	
+
 	if ( data[5] == "/incoming" ) {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
-	
+
 	if ( data[5] == "/working" ) {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
-	
+
 	if ( data[5] == "/home" ) {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
@@ -282,19 +324,18 @@ func getDiskInfo() string {
 	if (data[5] == "/var") {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
-	
+
 	if (data[5] == "/tmp") {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
     }
-    
+
     err = cmd.Wait()
     if (err != nil) {
         return ""
     }
 
     returned = strings.Trim(returned, " ")
-    
+
     return returned
 }
-
