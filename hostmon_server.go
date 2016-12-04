@@ -34,6 +34,7 @@ type Message struct {
     LoadFifteen float64
     SwapUsed float64
     KernelVer string
+    Release string
     Uptime string
     DiskReport string
 }
@@ -231,7 +232,7 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
     dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LIMIT 1;"
 
     //
-  	// Note regaarding db.QueryRow(): We should know how many fields we
+  	// Note regarding db.QueryRow(): We should know how many fields we
   	//  have in the table. For each field, specify a parameter to the
   	//  QueryRow().Scan() method. i.e.
   	//      db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
@@ -337,15 +338,15 @@ func handle_connection(c net.Conn) {
 	dbCmd = "SELECT * from reports where hostname = '" + m.Hostname + "' ORDER BY timestamp DESC LIMIT 1;"
 
   //
-	// Note regaarding db.QueryRow(): We should know how many fields we
+	// Note regarding db.QueryRow(): We should know how many fields we
 	//  have in the table. For each field, specify a parameter to the
 	//  QueryRow().Scan() method. i.e.
 	//      db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
   //
 
-	var dbTimeStamp, dbHostName, dbKernelVer, dbUptime, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
+	var dbTimeStamp, dbHostName, dbKernelVer, dbRelease, dbUptime, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
 
-	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbUptime, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
+	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbRelease, &dbUptime, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
 
   switch {
 	    // If this happens, first database entry for the host in question
@@ -361,7 +362,7 @@ func handle_connection(c net.Conn) {
 	// Insert the data points from the current report into the database.
   //
 
-	dbCmd = "INSERT INTO reports VALUES (" + strconv.FormatInt(m.Timestamp, 10) + ",'" + m.Hostname + "','" + m.KernelVer + "','" + m.Uptime + "','" + strconv.FormatInt(m.NumCPUs, 10) + "','" + strconv.FormatInt(m.Memtotal, 10) + "','" + strconv.FormatFloat(m.LoadOne, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFive, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFifteen, 'f', 6, 64) + "','" + strconv.FormatFloat(m.SwapUsed, 'f', 6, 64) + "','" + m.DiskReport + "');"
+	dbCmd = "INSERT INTO reports VALUES (" + strconv.FormatInt(m.Timestamp, 10) + ",'" + m.Hostname + "','" + m.KernelVer + "','" + m.Release + "','" + m.Uptime + "','" + strconv.FormatInt(m.NumCPUs, 10) + "','" + strconv.FormatInt(m.Memtotal, 10) + "','" + strconv.FormatFloat(m.LoadOne, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFive, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFifteen, 'f', 6, 64) + "','" + strconv.FormatFloat(m.SwapUsed, 'f', 6, 64) + "','" + m.DiskReport + "');"
 
 	_, dbExecErr = dbconn.Exec(dbCmd)
 	if dbExecErr != nil {
