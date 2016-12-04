@@ -10,6 +10,9 @@ A small agent runs out of cron the client at any user desired interval and
 collects the following data points:
 
 * Timestamp
+* Uptime
+* Linux kernel version
+* Linux release
 * Host name
 * Number of installed CPUs
 * Total physical memory
