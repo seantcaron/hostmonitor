@@ -37,7 +37,7 @@ for each host, prints the most recent available report in tabular format.
 The following SQL will build the reports table:
 
 ```
-CREATE TABLE reports (timestamp bigint, hostname varchar(68), kernelver varchar(65),
+CREATE TABLE reports (timestamp bigint, hostname varchar(68), kernelver varchar(65), release varchar(65),
   uptime varchar(16), numcpus varchar(8), physmem varchar(16), loadone varchar(12),
   loadfive varchar(12), loadfifteen varchar(12), swapused varchar(12), diskreport varchar(68));
 ```
