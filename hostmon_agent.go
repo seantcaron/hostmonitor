@@ -146,31 +146,30 @@ func getLoadAvgs() (float64, float64, float64) {
 func getRelease() (string) {
   var r string
 
-  // Easiest case, Red Hat and derived distributions (i.e. CentOS, Fedora)
   f, err := os.Open("/etc/redhat-release")
 
-  if (err == nil) {
+  // Debian and derived distributions need slightly more processing
+  if (err != nil) {
+    f, err = os.Open("/etc/os-release")
+
+    // Information unavailable or this is a distro that we don't support
+    if (err != nil) {
+      return "unknown"
+    }
+
+    input := bufio.NewScanner(f)
+    for input.Scan() {
+      i := input.Text()
+      d := strings.Split(i, "=")
+      if (d[0] == "PRETTY_NAME") {
+        r = d[1][1:len(d[1])-1]
+      }
+    }
+  } else {
+    // Red Hat and derived distributions are the easiest case
     input := bufio.NewScanner(f)
     input.Scan()
-    r := input.Text()
-    return r
-  } else {
-      // Debian and derived distributions (i.e. Ubuntu) need slightly more processing
-      f, err = os.Open("/etc/os-release")
-
-      if (err != nil) {
-        return "unknown"
-      }
-
-      input := bufio.NewScanner(f)
-      for input.Scan() {
-        inp := input.Text()
-        data := strings.Split(inp, "=")
-        if (data[0] == "PRETTY_NAME") {
-          r = data[1][1:len(data[1])-1]
-          return r
-        }
-      }
+    r = input.Text()
   }
 
   f.Close()
