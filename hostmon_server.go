@@ -6,51 +6,51 @@
 package main
 
 import (
-    //"io"
-    "net"
-    "os"
-    "fmt"
-    "strings"
-    "strconv"
-    "bufio"
-    "math"
-    "database/sql"
-    _ "github.com/go-sql-driver/mysql"
-    "net/smtp"
-    "bytes"
-    "log"
-    "time"
-    "encoding/json"
-    "net/http"
+  //"io"
+  "net"
+  "os"
+  "fmt"
+  "strings"
+  "strconv"
+  "bufio"
+  "math"
+  "database/sql"
+  _ "github.com/go-sql-driver/mysql"
+  "net/smtp"
+  "bytes"
+  "log"
+  "time"
+  "encoding/json"
+  "net/http"
 )
 
 type Message struct {
-    Timestamp int64
-    Hostname string
-    NumCPUs int64
-    Memtotal int64
-    LoadOne float64
-    LoadFive float64
-    LoadFifteen float64
-    SwapUsed float64
-    KernelVer string
-    Release string
-    Uptime string
-    DiskReport string
+  Timestamp int64
+  Hostname string
+  NumCPUs int64
+  Memtotal int64
+  LoadOne float64
+  LoadFive float64
+  LoadFifteen float64
+  SwapUsed float64
+  KernelVer string
+  Release string
+  Uptime string
+  DiskReport string
 }
 
 type Config struct {
-    DBUser string
-    DBPass string
-    DBName string
-    EMailTo string
-    EMailFrom string
-    LoadThresh float64
-    SwapThresh float64
-    LoadDThresh float64
-    SwapDThresh float64
-    DiskThresh int64
-    DiskRInterval int64
+  DBUser string
+  DBPass string
+  DBName string
+  EMailTo string
+  EMailFrom string
+  LoadThresh float64
+  SwapThresh float64
+  LoadDThresh float64
+  SwapDThresh float64
+  DiskThresh int64
+  DiskRInterval int64
 }
 
 //
@@ -203,7 +203,6 @@ func main() {
 
 func hostHandler(w http.ResponseWriter, r *http.Request) {
     var m Message
-    h := r.URL.Path[len("/host/"):]
 
     //
     // The DSN used to connect to the database should look like this:
@@ -229,37 +228,58 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
       return
     }
 
-    dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LIMIT 1;"
+    // Extract hostname component of the path and the method
+    h := r.URL.Path[len("/host/"):]
+    me := r.Method
 
-    //
-  	// Note regarding db.QueryRow(): We should know how many fields we
-  	//  have in the table. For each field, specify a parameter to the
-  	//  QueryRow().Scan() method. i.e.
-  	//      db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
-    //
+    log.Printf("Got host %s (len=%d) with method %s\n", h, len(h), me)
 
-  	queryErr := dbconn.QueryRow(dbCmd).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Uptime, &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
+    // We will key off r.Method = "GET" or "POST"
 
-    switch {
-  	    // If this happens, first database entry for the host in question
-  	    case queryErr == sql.ErrNoRows:
-          http.Error(w, "Fatal no such host " + h, http.StatusInternalServerError)
+    // /host/        GET -> list all POST -> do nothing
+    // /host/name    GET -> list one POST -> update (or create) one
+
+    switch me {
+    case "GET":
+      if (len(h) == 0) {
+      // If we get no host parameter, we'll dump the whole list, so, first
+      //  execute (1) and for each result in (1) execute (2).
+      dbCmd_1 := "SELECT host FROM hosts ORDER BY host ASC"
+      dbCmd_2 := "SELECT * FROM reports WHERE hostname = '" + h + "' ORDER BY timestamp DESC LIMIT 1;"
+      log.Printf("%s\n%s\n", dbCmd_1, dbCmd_2)
+    } else {
+      // When we do have a host, just grab the most recent line for that host.
+        dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LiMIT 1;"
+
+        //
+        // For each field, specify a parameter to QueryRow().Scan() i.e.
+        //  db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f3) and so on
+        //
+
+        queryErr := dbconn.QueryRow(dbCmd).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
+          &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
+
+        switch {
+        case queryErr == sql.ErrNoRows:
+          http.Error(w, "No such host " + h, http.StatusNotFound)
           return
-  	    case queryErr != nil:
+        case queryErr != nil:
           dbconn.Close()
           http.Error(w, "Fatal attempting to execute SELECT for host " + h, http.StatusInternalServerError)
           return
-  	    default:
-  	}
+        default:
+        }
+        rpt, err := json.Marshal(m)
 
-    rpt, err := json.Marshal(m)
+        if (err != nil) {
+          http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
+          return
+        }
 
-    if (err != nil) {
-      http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
-      return
+        fmt.Fprintf(w, "%s", rpt)
+      }
     }
 
-    fmt.Fprintf(w, "%s", rpt)
 }
 
 //
@@ -346,7 +366,8 @@ func handle_connection(c net.Conn) {
 
 	var dbTimeStamp, dbHostName, dbKernelVer, dbRelease, dbUptime, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
 
-	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbRelease, &dbUptime, &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
+	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbRelease, &dbUptime,
+    &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
 
   switch {
 	    // If this happens, first database entry for the host in question
@@ -432,25 +453,25 @@ func handle_connection(c net.Conn) {
 //
 
 func send_email_notification(subj string, body string) {
-    eMailConn, eMailErr := smtp.Dial("localhost:25")
-    if eMailErr != nil {
-        log.Printf("SMTP server connection failure sending notification\n")
-    }
+  eMailConn, eMailErr := smtp.Dial("localhost:25")
+  if eMailErr != nil {
+    log.Printf("SMTP server connection failure sending notification\n")
+  }
 
-    eMailConn.Mail(g_eMailFrom)
-    eMailConn.Rcpt(g_eMailTo)
+  eMailConn.Mail(g_eMailFrom)
+  eMailConn.Rcpt(g_eMailTo)
 
-    wc, eMailErr := eMailConn.Data()
-    if eMailErr != nil {
-        log.Printf("Failure initiating DATA stage sending notification\n")
-    }
+  wc, eMailErr := eMailConn.Data()
+  if eMailErr != nil {
+    log.Printf("Failure initiating DATA stage sending notification\n")
+  }
 
-    defer wc.Close()
+  defer wc.Close()
 
-    buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + subj + "\r\n\r\n" + body + "\r\n")
+  buf := bytes.NewBufferString("From: " + g_eMailFrom + "\r\n" + "To: " + g_eMailTo + "\r\n" + subj + "\r\n\r\n" + body + "\r\n")
 
-    _, eMailErr = buf.WriteTo(wc)
-    if eMailErr != nil {
-        log.Printf("Failure writing notification message DATA\n")
-    }
+  _, eMailErr = buf.WriteTo(wc)
+  if eMailErr != nil {
+    log.Printf("Failure writing notification message DATA\n")
+  }
 }
