@@ -244,9 +244,28 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
       if (len(h) == 0) {
       // If we get no host parameter, we'll dump the whole list, so, first
       //  execute (1) and for each result in (1) execute (2).
-      dbCmd_1 := "SELECT host FROM hosts ORDER BY host ASC"
-      dbCmd_2 := "SELECT * FROM reports WHERE hostname = '" + h + "' ORDER BY timestamp DESC LIMIT 1;"
-      log.Printf("%s\n%s\n", dbCmd_1, dbCmd_2)
+      rs, er := dbconn.Query("SELECT host from hosts ORDER BY host ASC")
+      if (er != nil) {
+        http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+      }
+      var hh string
+      for rs.Next() {
+        er = rs.Scan(&hh)
+        if (er != nil) {
+          http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+        }
+        dbCmd_2 := "SELECT * FROM reports WHERE hostname = '" + hh + "' ORDER BY timestamp DESC LIMIT 1;"
+        qe := dbconn.QueryRow(dbCmd_2).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
+          &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
+        if (qe  != nil) {
+          http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+        }
+        rp, erro := json.Marshal(m)
+        if (erro != nil) {
+          http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
+        }
+        fmt.Fprintf(w, "%s", rp)
+      }
     } else {
       // When we do have a host, just grab the most recent line for that host.
         dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LiMIT 1;"
