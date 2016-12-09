@@ -304,10 +304,95 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
 
     // Must call ParseForm() before accessing elements
     r.ParseForm()
-    bb := r.Form
-    log.Printf("Got POST <%s>\n", bb)
+    //bb := r.Form
+
+    // Populate message Fields
+    m.Timestamp, _ = strconv.ParseInt(r.FormValue("Timestamp"), 10, 64)
+    m.Hostname = r.FormValue("Hostname")
+    m.NumCPUs, _ = strconv.ParseInt(r.FormValue("NumCPUs"), 10, 64)
+    m.Memtotal, _ = strconv.ParseInt(r.FormValue("Memtotal"), 10, 64)
+    m.LoadOne, _ = strconv.ParseFloat(r.FormValue("LoadOne"), 64)
+    m.LoadFive, _ = strconv.ParseFloat(r.FormValue("LoadFive"), 64)
+    m.LoadFifteen, _ = strconv.ParseFloat(r.FormValue("LoadFifteen"), 64)
+    m.SwapUsed, _ = strconv.ParseFloat(r.FormValue("SwapUsed"), 64)
+    m.KernelVer = r.FormValue("KernelVer")
+    m.Release = r.FormValue("Release")
+    m.Uptime = r.FormValue("Uptime")
+    m.DiskReport = r.FormValue("DiskReport")
+
+    //
+  	// Check to see if the host exists in the host tracking table
+  	//
+
+    dbCmd := "SELECT COUNT(*) FROM hosts where host = '" + m.Hostname + "';"
+  	_, dbExecErr := dbconn.Exec(dbCmd)
+  	if dbExecErr != nil {
+      http.Error(w, "Fatal executing select for host " + m.Hostname, http.StatusInternalServerError)
+    }
+
+  	var hostp string
+  	_ = dbconn.QueryRow(dbCmd).Scan(&hostp)
+  	hostpi, _ := strconv.Atoi(hostp)
+
+  	//
+  	// If not, add it to the hosts table. MySQL will generate an ID
+  	//
+
+    if (hostpi == 0) {
+      dbCmd = "INSERT INTO hosts (host) VALUES ('" + m.Hostname + "');"
+  	  _, dbExecErr = dbconn.Exec(dbCmd)
+  	  if dbExecErr != nil {
+        http.Error(w, "Failed executing host table INSERT for host " + m.Hostname, http.StatusInternalServerError)
+      }
+  	}
+
+    //
+  	// Retrieve previous set of data points for this host from the reports
+  	//  table
+  	//
+
+  	dbCmd = "SELECT * from reports where hostname = '" + m.Hostname + "' ORDER BY timestamp DESC LIMIT 1;"
+
+    //
+  	// Note regarding db.QueryRow(): We should know how many fields we
+  	//  have in the table. For each field, specify a parameter to the
+  	//  QueryRow().Scan() method. i.e.
+  	//      db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
+    //
+
+  	var dbTimeStamp, dbHostName, dbKernelVer, dbRelease, dbUptime, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
+
+  	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbRelease, &dbUptime,
+      &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
+
+    switch {
+  	    // If this happens, first database entry for the host in question
+  	    case queryErr == sql.ErrNoRows:
+  	        log.Printf("No rows returned executing SELECT for host %s\n", m.Hostname)
+  	    case queryErr != nil:
+  	        dbconn.Close()
+            http.Error(w, "Fatal attempting to execute SELECT for host" + m.Hostname, http.StatusInternalServerError)
+  	    default:
+  	}
+
+    //
+  	// Insert the data points from the current report into the database.
+    //
+
+  	dbCmd = "INSERT INTO reports VALUES (" + strconv.FormatInt(m.Timestamp, 10) + ",'" + m.Hostname + "','" + m.KernelVer + "','" + m.Release + "','" + m.Uptime + "','" + strconv.FormatInt(m.NumCPUs, 10) + "','" + strconv.FormatInt(m.Memtotal, 10) + "','" + strconv.FormatFloat(m.LoadOne, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFive, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFifteen, 'f', 6, 64) + "','" + strconv.FormatFloat(m.SwapUsed, 'f', 6, 64) + "','" + m.DiskReport + "');"
+
+  	_, dbExecErr = dbconn.Exec(dbCmd)
+  	if dbExecErr != nil {
+  	    dbconn.Close()
+        http.Error(w, "Fatal executing reports table INSERT for host " + m.Hostname, http.StatusInternalServerError)
+  	}
+
+    // r.Form is automatically a parsed map with appropriate keys and values
+    //log.Printf("Got POST <%s>\n", bb)
+    log.Printf("POST from: %s %s %s\n", m.Hostname, m.KernelVer, m.Release)
   }
 
+  dbconn.Close()
 }
 
 //
