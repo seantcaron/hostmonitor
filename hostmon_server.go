@@ -240,64 +240,73 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
     // /host/name    GET -> list one POST -> update (or create) one
 
     switch me {
-    case "GET":
-      if (len(h) == 0) {
-      // If we get no host parameter, we'll dump the whole list, so, first
-      //  execute (1) and for each result in (1) execute (2).
-      rs, er := dbconn.Query("SELECT host from hosts ORDER BY host ASC")
-      if (er != nil) {
-        http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
-      }
-      var hh string
-      for rs.Next() {
-        er = rs.Scan(&hh)
-        if (er != nil) {
-          http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
-        }
-        dbCmd_2 := "SELECT * FROM reports WHERE hostname = '" + hh + "' ORDER BY timestamp DESC LIMIT 1;"
-        qe := dbconn.QueryRow(dbCmd_2).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
-          &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
-        if (qe  != nil) {
-          http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
-        }
-        rp, erro := json.Marshal(m)
-        if (erro != nil) {
-          http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
-        }
-        fmt.Fprintf(w, "%s", rp)
-      }
-    } else {
-      // When we do have a host, just grab the most recent line for that host.
-        dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LiMIT 1;"
+        case "GET":
+          if (len(h) == 0) {
+            // If we get no host parameter, we'll dump the whole list, so, first
+            //  execute (1) and for each result in (1) execute (2).
+            rs, er := dbconn.Query("SELECT host from hosts ORDER BY host ASC")
+            if (er != nil) {
+              http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+            }
+            var hh string
+            for rs.Next() {
+              er = rs.Scan(&hh)
+              if (er != nil) {
+                http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+              }
+              dbCmd_2 := "SELECT * FROM reports WHERE hostname = '" + hh + "' ORDER BY timestamp DESC LIMIT 1;"
+              qe := dbconn.QueryRow(dbCmd_2).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
+                &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
+              if (qe  != nil) {
+                http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+              }
+              rp, erro := json.Marshal(m)
+              if (erro != nil) {
+                http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
+              }
+              fmt.Fprintf(w, "%s", rp)
+            }
+          } else {
+            // When we do have a host, just grab the most recent line for that host.
+            dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LiMIT 1;"
 
-        //
-        // For each field, specify a parameter to QueryRow().Scan() i.e.
-        //  db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f3) and so on
-        //
+            //
+            // For each field, specify a parameter to QueryRow().Scan() i.e.
+            //  db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f3) and so on
+            //
 
-        queryErr := dbconn.QueryRow(dbCmd).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
-          &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
+            queryErr := dbconn.QueryRow(dbCmd).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
+              &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
 
-        switch {
-        case queryErr == sql.ErrNoRows:
-          http.Error(w, "No such host " + h, http.StatusNotFound)
-          return
-        case queryErr != nil:
-          dbconn.Close()
-          http.Error(w, "Fatal attempting to execute SELECT for host " + h, http.StatusInternalServerError)
-          return
-        default:
-        }
-        rpt, err := json.Marshal(m)
+            switch {
+              case queryErr == sql.ErrNoRows:
+                  http.Error(w, "No such host " + h, http.StatusNotFound)
+                  return
+              case queryErr != nil:
+                  dbconn.Close()
+                  http.Error(w, "Fatal attempting to execute SELECT for host " + h, http.StatusInternalServerError)
+                  return
+              default:
+            }
+            rpt, err := json.Marshal(m)
 
-        if (err != nil) {
-          http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
-          return
-        }
+            if (err != nil) {
+              http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
+              return
+            }
 
-        fmt.Fprintf(w, "%s", rpt)
-      }
+            fmt.Fprintf(w, "%s", rpt)
+          }
+  case "POST":
+    if (len(h) == 0) {
+      http.Error(w, "Must specify a host for a POST request", http.StatusInternalServerError)
     }
+
+    // Must call ParseForm() before accessing elements
+    r.ParseForm()
+    bb := r.Form
+    log.Printf("Got POST <%s>\n", bb)
+  }
 
 }
 
