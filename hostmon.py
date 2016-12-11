@@ -16,7 +16,7 @@ print('<body bgcolor=White text=Black vlink=Black text=Black>')
 print('<h1>Host Mon: ' + time.strftime("%A %b %d %H:%M:%S %Z", time.localtime()) + '</h1>')
 
 print('<table>')
-print('<tr><th>Host name</th><th>Kernel</th><th>Uptime</th><th>Cores</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used (%)</th><th>Disk report (%util)</th></tr>')
+print('<tr><th>Host name</th><th>Kernel</th><th>Release</th><th>Uptime</th><th>Cores</th><th>Physmem (kB)</th><th>Load 1</th><th>Load 5</th><th>Load 15</th><th>Swap used (%)</th><th>Disk report (%util)</th></tr>')
 
 cfg = ConfigParser.ConfigParser()
 cfg.read('/etc/hostmon/dashboard.ini')
@@ -52,47 +52,39 @@ for host in hosts:
             print('<tr bgcolor=#ccffcc><td>')
         else:
             print('<tr><td>')
-    
+
         print(row[1])
         print('</td><td>')
 	print(row[2])
 	print('</td><td>')
+    print(row[3])
+    print('</td><td>')
 
 	#print(row[3])
-	h = int(round(float(row[3])/3600))
-	m = int(round(float(row[3])%3600/60))
-	s = int(round(float(row[3])%60))
+	h = int(round(float(row[4])/3600))
+	m = int(round(float(row[4])%3600/60))
+	s = int(round(float(row[4])%60))
         print(str(h) + ":" + str(m) + ":" + str(s))
 
 	print('</td><td>')
-        print(row[4])
-        print('</td><td>')
         print(row[5])
+        print('</td><td>')
+        print(row[6])
         print('</td>')
 
-	if float(row[6]) > float(row[4]):
+	if float(row[7]) > float(row[5]):
 	    print('<td bgcolor=#ffb3b3>')
-	elif float(row[6]) > float(row[4])/2.0:
+	elif float(row[7]) > float(row[5])/2.0:
 	    print('<td bgcolor=#ffffb3>')
         else:
 	    print('<td>')
 
-        print(row[6])
+        print(row[7])
 	print('</td>')
 
-        if float(row[7]) > float(row[4]):
+        if float(row[8]) > float(row[5]):
 	    print('<td bgcolor=#ffb3b3>')
-        elif float(row[7]) > float(row[4])/2.0:
-	    print('<td bgcolor=#ffffb3>')
-	else:
-	    print('<td>')
-
-	print(row[7])
-	print('</td>')
-
-        if float(row[8]) > float(row[4]):
-	    print('<td bgcolor=#ffb3b3>')
-        elif float(row[8]) > float(row[4])/2.0:
+    elif float(row[8]) > float(row[5])/2.0:
 	    print('<td bgcolor=#ffffb3>')
 	else:
 	    print('<td>')
@@ -100,16 +92,26 @@ for host in hosts:
 	print(row[8])
 	print('</td>')
 
-	if float(row[9]) > 66.0:
+        if float(row[9]) > float(row[5]):
 	    print('<td bgcolor=#ffb3b3>')
-	elif float(row[9]) > 10.0:
+    elif float(row[9]) > float(row[5])/2.0:
 	    print('<td bgcolor=#ffffb3>')
 	else:
 	    print('<td>')
 
 	print(row[9])
-	print('</td><td>')
+	print('</td>')
+
+	if float(row[10]) > 66.0:
+	    print('<td bgcolor=#ffb3b3>')
+	elif float(row[10]) > 10.0:
+	    print('<td bgcolor=#ffffb3>')
+	else:
+	    print('<td>')
+
 	print(row[10])
+	print('</td><td>')
+	print(row[11])
         print('</td></tr>')
 
         tcores = tcores + int(row[4])
