@@ -381,6 +381,7 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
 
   	dbCmd = "INSERT INTO reports VALUES (" + strconv.FormatInt(m.Timestamp, 10) + ",'" + m.Hostname + "','" + m.KernelVer + "','" + m.Release + "','" + m.Uptime + "','" + strconv.FormatInt(m.NumCPUs, 10) + "','" + strconv.FormatInt(m.Memtotal, 10) + "','" + strconv.FormatFloat(m.LoadOne, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFive, 'f', 6, 64) + "','" + strconv.FormatFloat(m.LoadFifteen, 'f', 6, 64) + "','" + strconv.FormatFloat(m.SwapUsed, 'f', 6, 64) + "','" + m.DiskReport + "');"
 
+    log.Printf("Attempting to execute: %s\n", dbCmd)
   	_, dbExecErr = dbconn.Exec(dbCmd)
   	if dbExecErr != nil {
   	    dbconn.Close()
