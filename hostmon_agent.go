@@ -15,6 +15,9 @@ import (
     "net"
     "log"
     "encoding/json"
+    "net/http"
+    "net/url"
+    "bytes"
 )
 
 type Message struct {
@@ -35,6 +38,7 @@ type Message struct {
 
 func main() {
     var m Message
+    var t string
 
     if ((len(os.Args) != 3) || (os.Args[1] != "-h")) {
         log.Fatalf("Usage: %s -h server\n", os.Args[0])
@@ -62,6 +66,35 @@ func main() {
     if (strings.Index(m.Hostname, ".") != -1) {
         m.Hostname = m.Hostname[0:strings.Index(m.Hostname, ".")]
     }
+
+    p := url.Values{}
+    fmt.Sprintf(t, "%d", m.Timestamp)
+    p.Set("Timestamp", t)
+    p.Set("Hostname", m.Hostname)
+    fmt.Sprintf(t, "%d", m.NumCPUs)
+    p.Set("NumCPUs", t)
+    fmt.Sprintf(t, "%d", m.Memtotal)
+    p.Set("Memtotal", t)
+    fmt.Sprintf(t, "%f", m.LoadOne)
+    p.Set("LoadOne", t)
+    fmt.Sprintf(t, "%f", m.LoadFive)
+    p.Set("LoadFive", t)
+    fmt.Sprintf(t, "%f", m.LoadFifteen)
+    p.Set("LoadFifteen", t)
+    fmt.Sprintf(t, "%f", m.SwapUsed)
+    p.Set("SwapUsed", t)
+    p.Set("KernelVer", m.KernelVer)
+    p.Set("Release", m.Release)
+    p.Set("Uptime", m.Uptime)
+    p.Set("DiskReport", m.DiskReport)
+
+    cc := &http.Client{}
+    r, _ := http.NewRequest("POST", "http://"+os.Args[2]+":8962/host/"+m.Hostname, bytes.NewBufferString(p.Encode()))
+    r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+    r.Header.Add("Content-Length", strconv.Itoa(len(p.Encode())))
+
+    re, _ := cc.Do(r)
+    log.Printf(re.Status)
 
     conn, err := net.Dial("tcp", os.Args[2]+":5962")
     if err != nil {
@@ -316,9 +349,9 @@ func getDiskInfo() string {
 	    returned = returned + data[5] + " " + data[4] + " "
 	}
 
-        if (data[5] == "/exports/home") {
+  if (data[5] == "/exports/home") {
 	    returned = returned + data[5] + " " + data[4] + " "
-        }
+  }
 
 	if (data[5] == "/var") {
 	    returned = returned + data[5] + " " + data[4] + " "
