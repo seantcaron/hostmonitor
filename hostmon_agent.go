@@ -58,7 +58,7 @@ func main() {
     m.SwapUsed = ((float64(st)-float64(sf))/float64(st))*100.0
 
     m.DiskReport = getDiskInfo()
-
+    fmt.Printf("getDiskInfo() returned: %s\n", m.DiskReport)
     m.Timestamp = time.Now().Unix()
 
     m.Hostname, _ = os.Hostname()
@@ -68,24 +68,31 @@ func main() {
     }
 
     p := url.Values{}
-    fmt.Sprintf(t, "%d", m.Timestamp)
+    t = fmt.Sprintf("%d", m.Timestamp)
+    fmt.Printf("Timestamp should be <%s>\n", t)
     p.Set("Timestamp", t)
     p.Set("Hostname", m.Hostname)
-    fmt.Sprintf(t, "%d", m.NumCPUs)
+    t = fmt.Sprintf("%d", m.NumCPUs)
+    fmt.Printf("NumCPUs should be <%s>\n", t)
     p.Set("NumCPUs", t)
-    fmt.Sprintf(t, "%d", m.Memtotal)
+    t = fmt.Sprintf("%d", m.Memtotal)
+    fmt.Printf("Memtotal should be <%s>\n", t)
     p.Set("Memtotal", t)
-    fmt.Sprintf(t, "%f", m.LoadOne)
+    t = fmt.Sprintf("%f", m.LoadOne)
+    fmt.Printf("LoadOne should be <%s>\n", t)
     p.Set("LoadOne", t)
-    fmt.Sprintf(t, "%f", m.LoadFive)
+    t = fmt.Sprintf("%f", m.LoadFive)
+    fmt.Printf("LoadFive should be <%s>\n", t)
     p.Set("LoadFive", t)
-    fmt.Sprintf(t, "%f", m.LoadFifteen)
+    t = fmt.Sprintf("%f", m.LoadFifteen)
+    fmt.Printf("LoadFifteen should be <%s>\n", t)
     p.Set("LoadFifteen", t)
-    fmt.Sprintf(t, "%f", m.SwapUsed)
+    t = fmt.Sprintf("%f", m.SwapUsed)
     p.Set("SwapUsed", t)
     p.Set("KernelVer", m.KernelVer)
     p.Set("Release", m.Release)
     p.Set("Uptime", m.Uptime)
+    fmt.Printf("DiskReport should be <%s>\n", m.DiskReport)
     p.Set("DiskReport", m.DiskReport)
 
     cc := &http.Client{}
