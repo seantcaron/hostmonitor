@@ -12,9 +12,7 @@ import (
     "strings"
     "strconv"
     "time"
-    "net"
     "log"
-    "encoding/json"
     "net/http"
     "net/url"
     "bytes"
@@ -67,6 +65,7 @@ func main() {
         m.Hostname = m.Hostname[0:strings.Index(m.Hostname, ".")]
     }
 
+    // Compose the URI-encoded body of the POST request
     p := url.Values{}
     t = fmt.Sprintf("%d", m.Timestamp)
     fmt.Printf("Timestamp should be <%s>\n", t)
@@ -102,22 +101,6 @@ func main() {
 
     re, _ := cc.Do(r)
     log.Printf(re.Status)
-
-    conn, err := net.Dial("tcp", os.Args[2]+":5962")
-    if err != nil {
-        log.Fatalf("Error calling net.Dial()")
-    }
-
-    rpt, err := json.Marshal(m)
-
-    if (err != nil) {
-        log.Fatalf("Error attempting to marshal JSON")
-    }
-
-    //fmt.Fprintf(conn, "%s\n", rpt)
-    fmt.Printf("%s\n", rpt)
-
-    conn.Close()
 }
 
 //
