@@ -61,6 +61,8 @@ var g_diskThreshold, g_diskReportInterval int64
 
 var lastDNotify = make(map[string]int64)
 
+var dbconn *sql.DB
+
 func main() {
   //var bindaddr, conffile string
   var conffile string
@@ -164,6 +166,28 @@ func main() {
   log.Printf("Configuration report ends\n")
 
   //
+  // The DSN used to connect to the database should look like this:
+  //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
+  //
+
+  myDSN := g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
+
+  dbconn, err = sql.Open("mysql", myDSN)
+
+  if err != nil {
+    log.Fatalf("Fatal connecting to database\n")
+  }
+
+  //
+  // Test the database connection to make sure that we're in business.
+  //
+
+  err = dbconn.Ping()
+  if err != nil {
+    log.Fatalf("Fatal attempting to ping database")
+  }
+
+  //
   // Start listening for connections from the dashboard
   //
 
@@ -178,30 +202,6 @@ func main() {
 
 func hostHandler(w http.ResponseWriter, r *http.Request) {
   var m Message
-
-  //
-  // The DSN used to connect to the database should look like this:
-  //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
-  //
-
-  myDSN := g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
-
-  dbconn, dbConnErr := sql.Open("mysql", myDSN)
-
-  if dbConnErr != nil {
-    http.Error(w, "Fatal connecting to database", http.StatusInternalServerError)
-    return
-  }
-
-  //
-  // Test the database connection to make sure that we're in business.
-  //
-
-  dbPingErr := dbconn.Ping()
-  if dbPingErr != nil {
-    http.Error(w, "Fatal attempting to ping database", http.StatusInternalServerError)
-    return
-  }
 
   // Extract hostname component of the path and the method
   h := r.URL.Path[len("/host/"):]
@@ -244,7 +244,7 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
         }
       } else {
         // When we do have a host, just grab the most recent line for that host.
-        dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LiMIT 1;"
+        dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LIMIT 1;"
 
         //
         // For each field, specify a parameter to QueryRow().Scan() i.e.
@@ -419,7 +419,7 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
       }
     }
   }
-  
+
   dbconn.Close()
 }
 
