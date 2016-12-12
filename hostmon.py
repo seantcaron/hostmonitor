@@ -57,8 +57,8 @@ for host in hosts:
         print('</td><td>')
 	print(row[2])
 	print('</td><td>')
-    print(row[3])
-    print('</td><td>')
+        print(row[3])
+        print('</td><td>')
 
 	#print(row[3])
 	h = int(round(float(row[4])/3600))
@@ -84,7 +84,7 @@ for host in hosts:
 
         if float(row[8]) > float(row[5]):
 	    print('<td bgcolor=#ffb3b3>')
-    elif float(row[8]) > float(row[5])/2.0:
+        elif float(row[8]) > float(row[5])/2.0:
 	    print('<td bgcolor=#ffffb3>')
 	else:
 	    print('<td>')
@@ -94,7 +94,7 @@ for host in hosts:
 
         if float(row[9]) > float(row[5]):
 	    print('<td bgcolor=#ffb3b3>')
-    elif float(row[9]) > float(row[5])/2.0:
+        elif float(row[9]) > float(row[5])/2.0:
 	    print('<td bgcolor=#ffffb3>')
 	else:
 	    print('<td>')
@@ -114,8 +114,8 @@ for host in hosts:
 	print(row[11])
         print('</td></tr>')
 
-        tcores = tcores + int(row[4])
-        tphysmem = tphysmem + int(row[5])
+        tcores = tcores + int(row[5])
+        tphysmem = tphysmem + int(row[6])
         thosts = thosts + 1
 
     toggle = not toggle
