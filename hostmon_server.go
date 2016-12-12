@@ -103,7 +103,7 @@ func main() {
       theFields := strings.Fields(line)
       key := strings.ToLower(theFields[0])
 
-	    haveParam[theFields[0]] = true
+      haveParam[theFields[0]] = true
 
       switch key {
         case "dbuser":
@@ -166,13 +166,30 @@ func main() {
   log.Printf("Configuration report ends\n")
 
   //
+  // Start listening for connections from the dashboard
+  //
+
+  http.HandleFunc("/host/", task_handle_host)
+  http.ListenAndServe(":8962", nil)
+
+  dbconn.Close()
+}
+
+//
+// Handle a connection
+//
+
+func task_handle_host(w http.ResponseWriter, r *http.Request) {
+  var m Message
+
+  //
   // The DSN used to connect to the database should look like this:
   //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
   //
 
   myDSN := g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
 
-  dbconn, err = sql.Open("mysql", myDSN)
+  dbconn, err := sql.Open("mysql", myDSN)
 
   if err != nil {
     log.Fatalf("Fatal connecting to database\n")
@@ -186,22 +203,6 @@ func main() {
   if err != nil {
     log.Fatalf("Fatal attempting to ping database")
   }
-
-  //
-  // Start listening for connections from the dashboard
-  //
-
-  http.HandleFunc("/host/", hostHandler)
-
-  http.ListenAndServe(":8962", nil)
-}
-
-//
-// Handle a connection
-//
-
-func hostHandler(w http.ResponseWriter, r *http.Request) {
-  var m Message
 
   // Extract hostname component of the path and the method
   h := r.URL.Path[len("/host/"):]
@@ -419,8 +420,6 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
       }
     }
   }
-
-  dbconn.Close()
 }
 
 //
