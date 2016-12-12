@@ -62,216 +62,217 @@ var g_diskThreshold, g_diskReportInterval int64
 var lastDNotify = make(map[string]int64)
 
 func main() {
-    //var bindaddr, conffile string
-    var conffile string
+  //var bindaddr, conffile string
+  var conffile string
 
-    if (len(os.Args) != 5) {
-        log.Fatalf("Usage: %s -b bindaddr -f configfile", os.Args[0])
+  if (len(os.Args) != 5) {
+    log.Fatalf("Usage: %s -b bindaddr -f configfile", os.Args[0])
+  }
+
+  for i := 1; i < len(os.Args); i++ {
+    switch os.Args[i] {
+      //case "-b":
+        //bindaddr = os.Args[i+1]
+      case "-f":
+        conffile = os.Args[i+1]
     }
+  }
 
-    for i := 1; i < len(os.Args); i++ {
-        switch os.Args[i] {
-	    //case "-b":
-	        //bindaddr = os.Args[i+1]
-            case "-f":
-	        conffile = os.Args[i+1]
-        }
-    }
+  log.Printf("Host monitor data server starting up\n")
 
-    log.Printf("Host monitor data server starting up\n")
+  //
+  // Read in the configuration file.
+  //
 
-    //
-    // Read in the configuration file.
-    //
+  haveParam := make(map[string]bool)
 
-    haveParam := make(map[string]bool)
+  confFile, err := os.Open(conffile)
 
-    confFile, err := os.Open(conffile)
+  if err != nil {
+    log.Fatalf("Failed opening configuration file for reading\n")
+  }
 
-    if err != nil {
-        log.Fatalf("Failed opening configuration file for reading\n")
-    }
+  inp := bufio.NewScanner(confFile)
 
-    inp := bufio.NewScanner(confFile)
+  for inp.Scan() {
+    line := inp.Text()
 
-    for inp.Scan() {
-        line := inp.Text()
-
-        if (len(line) > 0) {
-	    theFields := strings.Fields(line)
-	    key := strings.ToLower(theFields[0])
+    if (len(line) > 0) {
+      theFields := strings.Fields(line)
+      key := strings.ToLower(theFields[0])
 
 	    haveParam[theFields[0]] = true
 
-	    switch key {
-	        case "dbuser":
-	            g_dbUser = theFields[1]
-	        case "dbpass":
-	            g_dbPass = theFields[1]
-	        case "dbhost":
-	            g_dbHost = theFields[1]
-	        case "dbname":
-	            g_dbName = theFields[1]
-	        case "emailto":
-	            g_eMailTo = theFields[1]
-	        case "emailfrom":
-	            g_eMailFrom = theFields[1]
-	        case "loadthreshold":
-	            g_loadThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	        case "swapthreshold":
-	            g_swapThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	        case "loadfirstdthreshold":
-	            g_loadFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	        case "swapfirstdthreshold":
-	            g_swapFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
-	        case "diskthreshold":
-	            g_diskThreshold, _ = strconv.ParseInt(theFields[1], 10, 64)
-                case "diskreportinterval":
-		    g_diskReportInterval, _ = strconv.ParseInt(theFields[1], 10, 64)
-	        default:
-		    log.Printf("Ignoring nonsense configuration parameter %s\n", theFields[1])
-            }
-	}
-    }
+      switch key {
+        case "dbuser":
+          g_dbUser = theFields[1]
+        case "dbpass":
+	        g_dbPass = theFields[1]
+	      case "dbhost":
+	        g_dbHost = theFields[1]
+	      case "dbname":
+          g_dbName = theFields[1]
+        case "emailto":
+	        g_eMailTo = theFields[1]
+	      case "emailfrom":
+	        g_eMailFrom = theFields[1]
+	      case "loadthreshold":
+          g_loadThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	      case "swapthreshold":
+	        g_swapThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+        case "loadfirstdthreshold":
+	        g_loadFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	      case "swapfirstdthreshold":
+	        g_swapFirstDThreshold, _ = strconv.ParseFloat(theFields[1], 64)
+	      case "diskthreshold":
+	        g_diskThreshold, _ = strconv.ParseInt(theFields[1], 10, 64)
+        case "diskreportinterval":
+          g_diskReportInterval, _ = strconv.ParseInt(theFields[1], 10, 64)
+        default:
+          log.Printf("Ignoring nonsense configuration parameter %s\n", theFields[1])
+      }
+	   }
+  }
 
-    confFile.Close()
+  confFile.Close()
 
-    //
-    // Make sure no configuration directives are missing
-    //
+  //
+  // Make sure no configuration directives are missing
+  //
 
-    if ((haveParam["dbUser"] != true) ||
-        (haveParam["dbPass"] != true) ||
-        (haveParam["dbHost"] != true) ||
-        (haveParam["dbName"] != true) ||
-        (haveParam["eMailTo"] != true) ||
-        (haveParam["eMailFrom"] != true) ||
-        (haveParam["loadThreshold"] != true) ||
-        (haveParam["swapThreshold"] != true) ||
-        (haveParam["loadFirstDThreshold"] != true) ||
-        (haveParam["swapFirstDThreshold"] != true) ||
-        (haveParam["diskThreshold"] != true) ||
-        (haveParam["diskReportInterval"] != true)) {
-        log.Fatalf("Fatal missing configuration directive\n")
-    }
+  if ((haveParam["dbUser"] != true) ||
+    (haveParam["dbPass"] != true) ||
+    (haveParam["dbHost"] != true) ||
+    (haveParam["dbName"] != true) ||
+    (haveParam["eMailTo"] != true) ||
+    (haveParam["eMailFrom"] != true) ||
+    (haveParam["loadThreshold"] != true) ||
+    (haveParam["swapThreshold"] != true) ||
+    (haveParam["loadFirstDThreshold"] != true) ||
+    (haveParam["swapFirstDThreshold"] != true) ||
+    (haveParam["diskThreshold"] != true) ||
+    (haveParam["diskReportInterval"] != true)) {
+      log.Fatalf("Fatal missing configuration directive\n")
+  }
 
-    log.Printf("Configuration report follows\n")
-    log.Printf("  DB user: %s DB host: %s DB name: %s\n", g_dbUser, g_dbHost, g_dbName)
-    log.Printf("  E-mail to: %s E-mail from: %s\n", g_eMailTo, g_eMailFrom)
-    log.Printf("  Thresholds: %f %f %f %f %d\n", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)
-    log.Printf("  Disk report interval: %d sec\n", g_diskReportInterval)
+  log.Printf("Configuration report follows\n")
+  log.Printf("  DB user: %s DB host: %s DB name: %s\n", g_dbUser, g_dbHost, g_dbName)
+  log.Printf("  E-mail to: %s E-mail from: %s\n", g_eMailTo, g_eMailFrom)
+  log.Printf("  Thresholds: %f %f %f %f %d\n", g_loadThreshold, g_swapThreshold, g_loadFirstDThreshold, g_swapFirstDThreshold, g_diskThreshold)
+  log.Printf("  Disk report interval: %d sec\n", g_diskReportInterval)
 
-    log.Printf("Configuration report ends\n")
+  log.Printf("Configuration report ends\n")
 
-    //
-    // Start listening for connections from the dashboard
-    //
+  //
+  // Start listening for connections from the dashboard
+  //
 
-    http.HandleFunc("/host/", hostHandler)
+  http.HandleFunc("/host/", hostHandler)
 
-    http.ListenAndServe(":8962", nil)
+  http.ListenAndServe(":8962", nil)
 }
 
 //
-// Handle a connection from the dashboard
+// Handle a connection
 //
 
 func hostHandler(w http.ResponseWriter, r *http.Request) {
-    var m Message
+  var m Message
 
-    //
-    // The DSN used to connect to the database should look like this:
-    //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
-    //
+  //
+  // The DSN used to connect to the database should look like this:
+  //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
+  //
 
-    myDSN := g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
+  myDSN := g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
 
-    dbconn, dbConnErr := sql.Open("mysql", myDSN)
+  dbconn, dbConnErr := sql.Open("mysql", myDSN)
 
-    if dbConnErr != nil {
-      http.Error(w, "Fatal connecting to database", http.StatusInternalServerError)
-      return
-    }
+  if dbConnErr != nil {
+    http.Error(w, "Fatal connecting to database", http.StatusInternalServerError)
+    return
+  }
 
-    //
-    // Test the database connection to make sure that we're in business.
-    //
+  //
+  // Test the database connection to make sure that we're in business.
+  //
 
-    dbPingErr := dbconn.Ping()
-    if dbPingErr != nil {
-      http.Error(w, "Fatal attempting to ping database", http.StatusInternalServerError)
-      return
-    }
+  dbPingErr := dbconn.Ping()
+  if dbPingErr != nil {
+    http.Error(w, "Fatal attempting to ping database", http.StatusInternalServerError)
+    return
+  }
 
-    // Extract hostname component of the path and the method
-    h := r.URL.Path[len("/host/"):]
-    me := r.Method
+  // Extract hostname component of the path and the method
+  h := r.URL.Path[len("/host/"):]
+  me := r.Method
 
-    log.Printf("Got host %s (len=%d) with method %s\n", h, len(h), me)
+  log.Printf("Got host %s (len=%d) with method %s\n", h, len(h), me)
 
-    // We will key off r.Method = "GET" or "POST"
+  // We will key off r.Method = "GET" or "POST"
 
-    // /host/        GET -> list all POST -> do nothing
-    // /host/name    GET -> list one POST -> update (or create) one
+  // /host/        GET -> list all POST -> do nothing
+  // /host/name    GET -> list one POST -> update (or create) one
 
-    switch me {
-        case "GET":
-          if (len(h) == 0) {
-            // If we get no host parameter, we'll dump the whole list, so, first
-            //  execute (1) and for each result in (1) execute (2).
-            rs, er := dbconn.Query("SELECT host from hosts ORDER BY host ASC")
-            if (er != nil) {
-              http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
-            }
-            var hh string
-            for rs.Next() {
-              er = rs.Scan(&hh)
-              if (er != nil) {
-                http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
-              }
-              dbCmd_2 := "SELECT * FROM reports WHERE hostname = '" + hh + "' ORDER BY timestamp DESC LIMIT 1;"
-              qe := dbconn.QueryRow(dbCmd_2).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
-                &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
-              if (qe  != nil) {
-                http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
-              }
-              rp, erro := json.Marshal(m)
-              if (erro != nil) {
-                http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
-              }
-              fmt.Fprintf(w, "%s", rp)
-            }
-          } else {
-            // When we do have a host, just grab the most recent line for that host.
-            dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LiMIT 1;"
+  switch me {
+    case "GET":
+      if (len(h) == 0) {
+        // If we get no host parameter, we'll dump the whole list, so, first
+        //  execute (1) and for each result in (1) execute (2).
+        rs, er := dbconn.Query("SELECT host from hosts ORDER BY host ASC")
+        if (er != nil) {
+          http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+        }
 
-            //
-            // For each field, specify a parameter to QueryRow().Scan() i.e.
-            //  db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f3) and so on
-            //
-
-            queryErr := dbconn.QueryRow(dbCmd).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
-              &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
-
-            switch {
-              case queryErr == sql.ErrNoRows:
-                  http.Error(w, "No such host " + h, http.StatusNotFound)
-                  return
-              case queryErr != nil:
-                  dbconn.Close()
-                  http.Error(w, "Fatal attempting to execute SELECT for host " + h, http.StatusInternalServerError)
-                  return
-              default:
-            }
-            rpt, err := json.Marshal(m)
-
-            if (err != nil) {
-              http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
-              return
-            }
-
-            fmt.Fprintf(w, "%s", rpt)
+        var hh string
+        for rs.Next() {
+          er = rs.Scan(&hh)
+          if (er != nil) {
+            http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
           }
+          dbCmd_2 := "SELECT * FROM reports WHERE hostname = '" + hh + "' ORDER BY timestamp DESC LIMIT 1;"
+          qe := dbconn.QueryRow(dbCmd_2).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
+            &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
+          if (qe  != nil) {
+            http.Error(w, "Fatal attempting to dump hosts", http.StatusInternalServerError)
+          }
+          rp, erro := json.Marshal(m)
+          if (erro != nil) {
+            http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
+          }
+          fmt.Fprintf(w, "%s", rp)
+        }
+      } else {
+        // When we do have a host, just grab the most recent line for that host.
+        dbCmd := "SELECT * from reports where hostname = '" + h + "' ORDER BY timestamp DESC LiMIT 1;"
+
+        //
+        // For each field, specify a parameter to QueryRow().Scan() i.e.
+        //  db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f3) and so on
+        //
+
+        queryErr := dbconn.QueryRow(dbCmd).Scan(&m.Timestamp, &m.Hostname, &m.KernelVer, &m.Release, &m.Uptime,
+          &m.NumCPUs, &m.Memtotal, &m.LoadOne, &m.LoadFive, &m.LoadFifteen, &m.SwapUsed, &m.DiskReport)
+
+        switch {
+          case queryErr == sql.ErrNoRows:
+            http.Error(w, "No such host " + h, http.StatusNotFound)
+            return
+          case queryErr != nil:
+            dbconn.Close()
+            http.Error(w, "Fatal attempting to execute SELECT for host " + h, http.StatusInternalServerError)
+            return
+          default:
+        }
+        rpt, err := json.Marshal(m)
+
+        if (err != nil) {
+          http.Error(w, "Fatal attempting to marshal JSON", http.StatusInternalServerError)
+          return
+        }
+
+        fmt.Fprintf(w, "%s", rpt)
+      }
   case "POST":
     if (len(h) == 0) {
       http.Error(w, "Must specify a host for a POST request", http.StatusInternalServerError)
@@ -384,10 +385,10 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
   	//
 
     if (m.LoadOne > dbLoadOneF) {
-  	    if ((m.LoadOne > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
-  	        lo := strconv.FormatFloat(m.LoadOne, 'f', 6, 64)
-  	        send_email_notification("Subject: System load warning on " + m.Hostname, "System load has reached " + lo + " from " + dbLoadOne)
-  	    }
+      if ((m.LoadOne > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
+        lo := strconv.FormatFloat(m.LoadOne, 'f', 6, 64)
+        send_email_notification("Subject: System load warning on " + m.Hostname, "System load has reached " + lo + " from " + dbLoadOne)
+      }
   	}
 
     //
@@ -396,10 +397,10 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
   	//
 
   	if (m.SwapUsed > dbSwapPctUsedF) {
-  	    if ((m.SwapUsed > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
-  	        su := strconv.FormatFloat(m.SwapUsed, 'f', 6, 64)
-  	        send_email_notification("Subject: Swap utilization warning on " + m.Hostname, "Swap utilization has reached " + su + "% from " + dbSwapPctUsed + "%")
-  	    }
+      if ((m.SwapUsed > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
+        su := strconv.FormatFloat(m.SwapUsed, 'f', 6, 64)
+  	    send_email_notification("Subject: Swap utilization warning on " + m.Hostname, "Swap utilization has reached " + su + "% from " + dbSwapPctUsed + "%")
+  	  }
   	}
 
     //
@@ -408,17 +409,17 @@ func hostHandler(w http.ResponseWriter, r *http.Request) {
   	//
 
     diskReptComponents := strings.Fields(m.DiskReport)
-        for i := 0; i < len(diskReptComponents)-1; i++ {
-          valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 
-          if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[m.Hostname])) >= float64(g_diskReportInterval))) {
-            send_email_notification("Subject: Disk utilization warning on " + m.Hostname, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
-  		lastDNotify[m.Hostname] = time.Now().Unix()
-          }
-        }
+    for i := 0; i < len(diskReptComponents)-1; i++ {
+      valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
 
+      if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[m.Hostname])) >= float64(g_diskReportInterval))) {
+        send_email_notification("Subject: Disk utilization warning on " + m.Hostname, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
+        lastDNotify[m.Hostname] = time.Now().Unix()
+      }
+    }
   }
-
+  
   dbconn.Close()
 }
 
