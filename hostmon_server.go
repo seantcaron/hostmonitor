@@ -435,7 +435,7 @@ func task_handle_host(w http.ResponseWriter, r *http.Request) {
 //
 
 func task_scan_and_notify() {
-  t := time.NewTicker(time.Second*60)
+  t := time.NewTicker(time.Second*60) // Fixed for testing, configurable when done
 
   var htt []string
 
@@ -443,24 +443,53 @@ func task_scan_and_notify() {
     // Dump the list of hosts
     rs, er := dbconn.Query("SELECT host from hosts ORDER BY host ASC")
     if (er != nil) {
-      log.Fatalf("Fatal attempting to scan and notify")
+      log.Fatalf("Fatal compiling list for scan and notify")
     }
 
     var hh string
     for rs.Next() {
       er = rs.Scan(&hh)
       if (er != nil) {
-        log.Fatalf("Fatal attempting to scan and notify")
+        log.Fatalf("Fatal compiling list for scan and notify")
       }
 
       htt = append(htt, hh)
     }
 
-    log.Printf("Host dump follows")
     // For each host, run checks and send notifications
+
     for c, _ := range htt {
-      log.Printf("  %s", htt[c])
+      rss, err := dbconn.Query("SELECT * FROM reports WHERE hostname = '" + htt[c] + "' ORDER BY timestamp DESC LIMIT 2")
+      if (err != nil) {
+        log.Fatalf("Fatal attempting to scan and notify 1")
+      }
+
+      var f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11 string
+
+      // Collect data point 1 for this host
+      rss.Next()
+      err = rss.Scan(&f0, &f1, &f2, &f3, &f4, &f5, &f6, &f7, &f8, &f9, &f10, &f11)
+      if (err != nil) {
+        log.Fatalf("Fatal attempting to scan and notify 2")
+      }
+
+      log.Printf("#1: %s %s %s %s %s", f0, f1, f2, f3, f4)
+
+      // Collect data point 2 for this host
+      rss.Next()
+      err = rss.Scan(&f0, &f1, &f2, &f3, &f4, &f5, &f6, &f7, &f8, &f9, &f10, &f11)
+      if (err != nil) {
+        log.Printf("Only one record for host " + htt[c])
+        continue
+      }
+
+      log.Printf("#2: %s %s %s %s %s", f0, f1, f2, f3, f4)
     }
+
+    //log.Printf("Host dump follows")
+    //for c, _ := range htt {
+    //  log.Printf("  %s", htt[c])
+    //}
 
     htt = nil
 
