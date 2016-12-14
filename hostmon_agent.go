@@ -88,11 +88,18 @@ func main() {
     p.Set("DiskReport", m.DiskReport)
 
     cc := &http.Client{}
-    r, _ := http.NewRequest("POST", "http://"+os.Args[2]+":8962/host/"+m.Hostname, bytes.NewBufferString(p.Encode()))
+    r, err := http.NewRequest("POST", "http://"+os.Args[2]+":8962/host/"+m.Hostname, bytes.NewBufferString(p.Encode()))
+    if (err != nil) {
+      log.Fatalf("Fatal calling http.NewRequest()")
+    }
     r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
     r.Header.Add("Content-Length", strconv.Itoa(len(p.Encode())))
 
-    re, _ := cc.Do(r)
+    re, errr := cc.Do(r)
+    if (errr != nil) {
+      log.Fatalf("Fatal calling http.Client.Do()")
+    }
+    
     log.Printf(re.Status)
 }
 
