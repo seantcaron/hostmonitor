@@ -376,56 +376,6 @@ func task_handle_host(w http.ResponseWriter, r *http.Request) {
     //log.Printf("Got POST <%s>\n", bb)
     log.Printf("POST from: %s %s %s\n", m.Hostname, m.KernelVer, m.Release)
 
-    //
-  	// Now we have historic (from the database) and current (from the current connection) data points and we
-  	// can act on these i.e. calculate differentials and send notifications.
-  	//
-
-  	dbLoadOneF,_ := strconv.ParseFloat(dbLoadOne, 64)
-  	dbSwapPctUsedF, _ := strconv.ParseFloat(dbSwapPctUsed, 64)
-
-  	loadDifferential := math.Abs(dbLoadOneF-m.LoadOne)
-  	swapDifferential := math.Abs(dbSwapPctUsedF-m.SwapUsed)
-
-    //
-  	// Look at system load for this host and send notification if the threshold is exceeded. We only consider situations where the new load is
-  	//  greater than the old load to be actionable, no sense in messaging on a load DECREASE.
-  	//
-
-    if (m.LoadOne > dbLoadOneF) {
-      if ((m.LoadOne > g_loadThreshold) && (loadDifferential > g_loadFirstDThreshold)) {
-        lo := strconv.FormatFloat(m.LoadOne, 'f', 6, 64)
-        send_email_notification("Subject: System load warning on " + m.Hostname, "System load has reached " + lo + " from " + dbLoadOne)
-      }
-  	}
-
-    //
-  	// Look at swap utilization for this host and send notification if the threshold is exceeded. Again, we only consider the situation where the
-  	//  new swap utilization is greater than the old utilization to be actionable, no sense in messging on swap utilization DECREASE.
-  	//
-
-  	if (m.SwapUsed > dbSwapPctUsedF) {
-      if ((m.SwapUsed > g_swapThreshold) && (swapDifferential > g_swapFirstDThreshold)) {
-        su := strconv.FormatFloat(m.SwapUsed, 'f', 6, 64)
-  	    send_email_notification("Subject: Swap utilization warning on " + m.Hostname, "Swap utilization has reached " + su + "% from " + dbSwapPctUsed + "%")
-  	  }
-  	}
-
-    //
-  	// Now let's look at the disk utilization report for this host and send an alert if the threshold is exceeded. Since disk utilization usually
-  	//  varies at a much slower rate than system load or swap consumption, we notify for disk only at specified intervals, not every run.
-  	//
-
-    diskReptComponents := strings.Fields(m.DiskReport)
-
-    for i := 0; i < len(diskReptComponents)-1; i++ {
-      valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
-
-      if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[m.Hostname])) >= float64(g_diskReportInterval))) {
-        send_email_notification("Subject: Disk utilization warning on " + m.Hostname, "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
-        lastDNotify[m.Hostname] = time.Now().Unix()
-      }
-    }
   }
 }
 
@@ -465,25 +415,63 @@ func task_scan_and_notify() {
       }
 
       var f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11 string
-
-      // Collect data point 1 for this host
+      var f0h, f1h, f2h, f3h, f4h, f5h, f6h, f7h, f8h, f9h, f10h, f11h string
+      // Collect data point 1 for this host (most recent)
       rss.Next()
       err = rss.Scan(&f0, &f1, &f2, &f3, &f4, &f5, &f6, &f7, &f8, &f9, &f10, &f11)
       if (err != nil) {
-        log.Fatalf("Fatal attempting to scan and notify 2")
+        log.Printf("Skipping inconsistent host " + htt[c] + ", host in hosts table but no reports found")
+        continue
       }
 
       log.Printf("#1: %s %s %s %s %s", f0, f1, f2, f3, f4)
 
-      // Collect data point 2 for this host
+      // Collect data point 2 for this host (historical)
       rss.Next()
-      err = rss.Scan(&f0, &f1, &f2, &f3, &f4, &f5, &f6, &f7, &f8, &f9, &f10, &f11)
+      err = rss.Scan(&f0h, &f1h, &f2h, &f3h, &f4h, &f5h, &f6h, &f7h, &f8h, &f9h, &f10h, &f11h)
       if (err != nil) {
         log.Printf("Only one record for host " + htt[c])
         continue
       }
 
       log.Printf("#2: %s %s %s %s %s", f0, f1, f2, f3, f4)
+
+      lo, _ := strconv.ParseFloat(f7, 64)
+      loh, _ := strconv.ParseFloat(f7h, 64)
+      sw, _ := strconv.ParseFloat(f10, 64)
+      swh, _ := strconv.ParseFloat(f10h, 64)
+
+      dl := math.Abs(lo-loh)
+      ds := math.Abs(sw-swh)
+
+      log.Printf("%f %f", dl, ds)
+
+      // Look at system load and notify on positive differential exceeding Thresholds
+      if (lo > loh) {
+        if ((lo > g_loadThreshold) && (dl > g_loadFirstDThreshold)) {
+          send_email_notification("Subject: System load warning on " + htt[c], "System load has reached " + f7 + " from " + f7h)
+        }
+      }
+
+      // Look at swap utilization and notify on positive differential exceeding thresholds
+      if (sw > swh) {
+        if ((sw > g_swapThreshold) && (ds > g_swapFirstDThreshold)) {
+          send_email_notification("Subject: Swap utilization warning on " + htt[c], "Swap utilization has reached " + f10 + "% from " + f10h + "%")
+        }
+      }
+
+      // Look at disk report and notify on threshold exceeded
+      diskReptComponents := strings.Fields(f11)
+
+      for i := 0; i < len(diskReptComponents)-1; i++ {
+        valueToTest, _ := strconv.ParseInt(diskReptComponents[i+1], 10, 64)
+
+        if ((valueToTest >= g_diskThreshold) && (math.Abs(float64(time.Now().Unix() - lastDNotify[htt[c]])) >= float64(g_diskReportInterval))) {
+          send_email_notification("Subject: Disk utilization warning on " + htt[c], "Disk utilization on " + diskReptComponents[i] + " has reached " + diskReptComponents[i+1] + "%")
+          lastDNotify[htt[c]] = time.Now().Unix()
+        }
+      }
+
     }
 
     //log.Printf("Host dump follows")
