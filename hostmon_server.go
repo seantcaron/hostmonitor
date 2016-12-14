@@ -165,6 +165,33 @@ func main() {
 
   log.Printf("Configuration report ends\n")
 
+  // Begin code snippet
+
+  //
+  // The DSN used to connect to the database should look like this:
+  //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
+  //
+
+  myDSN := g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
+
+  // When dbconn is global, this needs to be =, not := !!
+  dbconn, err = sql.Open("mysql", myDSN)
+
+  if err != nil {
+    log.Fatalf("Fatal connecting to database\n")
+  }
+
+  //
+  // Test the database connection to make sure that we're in business.
+  //
+
+  err = dbconn.Ping()
+  if err != nil {
+    log.Fatalf("Fatal attempting to ping database")
+  }
+
+  // End code snippet
+
   //
   // Start listening for connections from the dashboard
   //
@@ -181,28 +208,6 @@ func main() {
 
 func task_handle_host(w http.ResponseWriter, r *http.Request) {
   var m Message
-
-  //
-  // The DSN used to connect to the database should look like this:
-  //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
-  //
-
-  myDSN := g_dbUser + ":" + g_dbPass + "@tcp(" + g_dbHost + ":3306)/" + g_dbName
-
-  dbconn, err := sql.Open("mysql", myDSN)
-
-  if err != nil {
-    log.Fatalf("Fatal connecting to database\n")
-  }
-
-  //
-  // Test the database connection to make sure that we're in business.
-  //
-
-  err = dbconn.Ping()
-  if err != nil {
-    log.Fatalf("Fatal attempting to ping database")
-  }
 
   // Extract hostname component of the path and the method
   h := r.URL.Path[len("/host/"):]
