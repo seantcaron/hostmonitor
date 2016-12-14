@@ -165,8 +165,6 @@ func main() {
 
   log.Printf("Configuration report ends\n")
 
-  // Begin code snippet
-
   //
   // The DSN used to connect to the database should look like this:
   //   hostmon:xyzzy123@tcp(192.168.1.253:3306)/hostmonitor
@@ -190,7 +188,11 @@ func main() {
     log.Fatalf("Fatal attempting to ping database")
   }
 
-  // End code snippet
+  //
+  // Start notifier Goroutine
+  //
+
+  go task_scan_and_notify()
 
   //
   // Start listening for connections from the dashboard
@@ -303,8 +305,8 @@ func task_handle_host(w http.ResponseWriter, r *http.Request) {
     m.DiskReport = r.FormValue("DiskReport")
 
     //
-  	// Check to see if the host exists in the host tracking table
-  	//
+    // Check to see if the host exists in the host tracking table
+    //
 
     dbCmd := "SELECT COUNT(*) FROM hosts where host = '" + m.Hostname + "';"
   	_, dbExecErr := dbconn.Exec(dbCmd)
@@ -312,39 +314,39 @@ func task_handle_host(w http.ResponseWriter, r *http.Request) {
       http.Error(w, "Fatal executing select for host " + m.Hostname, http.StatusInternalServerError)
     }
 
-  	var hostp string
-  	_ = dbconn.QueryRow(dbCmd).Scan(&hostp)
-  	hostpi, _ := strconv.Atoi(hostp)
+    var hostp string
+    _ = dbconn.QueryRow(dbCmd).Scan(&hostp)
+    hostpi, _ := strconv.Atoi(hostp)
 
-  	//
-  	// If not, add it to the hosts table. MySQL will generate an ID
-  	//
+    //
+    // If not, add it to the hosts table. MySQL will generate an ID
+    //
 
     if (hostpi == 0) {
       dbCmd = "INSERT INTO hosts (host) VALUES ('" + m.Hostname + "');"
-  	  _, dbExecErr = dbconn.Exec(dbCmd)
-  	  if dbExecErr != nil {
+      _, dbExecErr = dbconn.Exec(dbCmd)
+      if dbExecErr != nil {
         http.Error(w, "Failed executing host table INSERT for host " + m.Hostname, http.StatusInternalServerError)
       }
-  	}
+    }
 
     //
-  	// Retrieve previous set of data points for this host from the reports
-  	//  table
-  	//
+    // Retrieve previous set of data points for this host from the reports
+    //  table
+    //
 
   	dbCmd = "SELECT * from reports where hostname = '" + m.Hostname + "' ORDER BY timestamp DESC LIMIT 1;"
 
     //
-  	// Note regarding db.QueryRow(): We should know how many fields we
+    // Note regarding db.QueryRow(): We should know how many fields we
   	//  have in the table. For each field, specify a parameter to the
   	//  QueryRow().Scan() method. i.e.
   	//      db.QueryRow(cmd).Scan(&f1, &f2, &f3, &f4) and so on
     //
 
-  	var dbTimeStamp, dbHostName, dbKernelVer, dbRelease, dbUptime, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
+    var dbTimeStamp, dbHostName, dbKernelVer, dbRelease, dbUptime, dbNumCPUs, dbPhysMem, dbLoadOne, dbLoadFive, dbLoadFifteen, dbSwapPctUsed, dbDiskReport string
 
-  	queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbRelease, &dbUptime,
+    queryErr := dbconn.QueryRow(dbCmd).Scan(&dbTimeStamp, &dbHostName, &dbKernelVer, &dbRelease, &dbUptime,
       &dbNumCPUs, &dbPhysMem, &dbLoadOne, &dbLoadFive, &dbLoadFifteen, &dbSwapPctUsed, &dbDiskReport)
 
     switch {
@@ -424,6 +426,44 @@ func task_handle_host(w http.ResponseWriter, r *http.Request) {
         lastDNotify[m.Hostname] = time.Now().Unix()
       }
     }
+  }
+}
+
+//
+// Scan hosts database at configured intervals and send notifications if
+// thresholds have been exceeded.
+//
+
+func task_scan_and_notify() {
+  t := time.NewTicker(time.Second*60)
+
+  var htt []string
+
+  for range t.C {
+    // Dump the list of hosts
+    rs, er := dbconn.Query("SELECT host from hosts ORDER BY host ASC")
+    if (er != nil) {
+      log.Fatalf("Fatal attempting to scan and notify")
+    }
+
+    var hh string
+    for rs.Next() {
+      er = rs.Scan(&hh)
+      if (er != nil) {
+        log.Fatalf("Fatal attempting to scan and notify")
+      }
+
+      htt = append(htt, hh)
+    }
+
+    log.Printf("Host dump follows")
+    // For each host, run checks and send notifications
+    for c, _ := range htt {
+      log.Printf("  %s", htt[c])
+    }
+
+    htt = nil
+
   }
 }
 
